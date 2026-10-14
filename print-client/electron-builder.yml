@@ -1,0 +1,46 @@
+# T153：工位软件打包配置（FR-074）
+#
+# 要求：Win10 安装包（32/64 位），安装后自动注册本地打印服务。
+#
+# 关于"自动注册本地打印服务"：本地打印服务由 Electron 主进程托管
+# （见 src/main/index.ts），随应用启动即监听 127.0.0.1。
+# 因此这里的注册 = 让软件开机自启，而不是注册一个 Windows 服务。
+# 这样做的好处是不需要管理员权限写系统服务，卸载时也不会残留。
+appId: com.labelmgmt.print-client
+productName: 打印管理系统工位软件
+copyright: Copyright © 2026
+
+directories:
+  output: release
+  buildResources: build
+
+files:
+  - dist/**/*
+  - package.json
+
+# 32/64 位都要出包：工厂里的工位电脑不少还是 32 位系统
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+        - ia32
+  # 工位软件不签名，但保留配置位置便于后续接入企业证书
+  signAndEditExecutable: true
+
+nsis:
+  oneClick: false
+  perMachine: true
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: 打印管理系统工位软件
+  # 装完直接启动——操作员不必再自己去找图标
+  runAfterFinish: true
+  # 卸载时一并清掉开机自启项，不留残留
+  deleteAppDataOnUninstall: false
+
+publish: null
+
+extraMetadata:
+  main: dist/main/index.js

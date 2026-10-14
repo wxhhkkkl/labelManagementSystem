@@ -1,0 +1,37 @@
+# ---------------------------------------------------------------------------
+# 仅用于**本地开发/测试**的 MySQL。
+#
+# 生产不使用 Docker：数据库就跑在 meichao.yuwangchenfa.com 上，
+# 建库脚本见 docs/ops/bootstrap.sql，连接信息见 backend/.env。
+#
+# 本地跑集成测试时，用这里的测试库（库名含 "test"，见 backend/tests/conftest.py 的防护）：
+#   docker compose up -d
+#   TEST_DATABASE_URL=mysql+pymysql://lms:lms@127.0.0.1:3306/labelManagementSystemDB_test?charset=utf8mb4 pytest
+# ---------------------------------------------------------------------------
+services:
+  mysql:
+    # 必须 8.0.1+：SKIP LOCKED 用于并发取码，见 research.md R2
+    image: mysql:8.0
+    container_name: lms-mysql
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --default-storage-engine=InnoDB
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: labelManagementSystemDB_test
+      MYSQL_USER: lms
+      MYSQL_PASSWORD: lms
+    ports:
+      - "3306:3306"
+    volumes:
+      - lms-mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-plms"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  lms-mysql-data:
+

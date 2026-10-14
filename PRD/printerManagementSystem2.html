@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="docx-page-size" content="A4">
+  <title>打印管理系统产品需求文档</title>
+  <style>
+  @page {
+    @bottom-center { content: counter(page); }
+  }
+  @page cover {
+    @bottom-center { content: none; }
+  }
+  section[role="cover"] { page: cover; }
+
+  :root {
+    /* Typography tokens (business-modern) */
+    --typography-fontFamily-heading: 微软雅黑, Microsoft YaHei, PingFang SC;
+    --typography-fontFamily-body: 微软雅黑, Microsoft YaHei, PingFang SC;
+    --typography-fontSize-title: 32pt;
+    --typography-fontSize-subtitle: 20pt;
+    --typography-fontSize-h1: 22pt;
+    --typography-fontSize-coverTitle: 26pt;
+    --typography-fontSize-coverCategory: 15pt;
+    --typography-fontSize-sectionHeader: 14.5pt;
+    --typography-fontSize-h2: 15pt;
+    --typography-fontSize-h3: 12pt;
+    --typography-fontSize-body: 11pt;
+    --typography-fontSize-small: 10pt;
+    --typography-fontSize-tiny: 9pt;
+    --typography-lineHeight-body: 1.6;
+    --typography-lineHeight-compact: 1.2;
+    --typography-fontWeight-heading: 600;
+    --typography-fontWeight-body: 400;
+    /* Color tokens */
+    --color-primary: #1565C0;
+    --color-secondary: #0288D1;
+    --color-accent: #00897B;
+    --color-text: #212121;
+    --color-textSecondary: #616161;
+    --color-heading: #1A237E;
+    --color-divider: #E0E0E0;
+    --color-background: #FFFFFF;
+    --color-surface: #F5F7FA;
+    --color-emphasis: #C62828;
+    /* Spacing & layout tokens */
+    --spacing-paragraph: 0.75em;
+    --spacing-section: 2em;
+    --spacing-block: 1em;
+    --layout-marginTop: 2.5cm;
+    --layout-marginBottom: 2.0cm;
+    --layout-marginLeft: 2.5cm;
+    --layout-marginRight: 2.5cm;
+    --page-content-width: 16cm;
+    /* Spacing aliases */
+    --spacing-2xs: 0.25em;
+    --spacing-xs: 0.3em;
+    --spacing-s: 0.35em;
+    --spacing-sm: 0.45em;
+    --spacing-m: 0.5em;
+    --spacing-lg: 0.6em;
+    --spacing-xl: 0.8em;
+    --spacing-2xl: 1.2em;
+    --spacing-list: 1.5em;
+    --spacing-cell-y: 0.45em;
+    --spacing-cell-x: 0.6em;
+    --spacing-note-y: 0.5em;
+    --spacing-note-x: 0.8em;
+    /* Aliases */
+    --fs-h2: var(--typography-fontSize-h2);
+    --fs-h3: var(--typography-fontSize-h3);
+    --fs-body: var(--typography-fontSize-body);
+    --fs-small: var(--typography-fontSize-small);
+    --ff-heading: var(--typography-fontFamily-heading);
+    --ff-body: var(--typography-fontFamily-body);
+    --lh-body: var(--typography-lineHeight-body);
+    --fw-bold: 700;
+    --fw-heading: var(--typography-fontWeight-heading);
+    --color-muted: var(--color-textSecondary);
+    --color-border: var(--color-divider);
+    --color-highlight: var(--color-surface);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: var(--ff-body);
+    font-size: var(--fs-body);
+    line-height: var(--lh-body);
+    color: var(--color-text);
+    background: var(--color-background);
+    max-width: var(--page-content-width);
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  /* ===== Cover ===== */
+  .report-cover {
+    padding: var(--layout-marginTop) var(--layout-marginLeft);
+    background: var(--color-surface);
+    min-height: 60vh;
+  }
+  .cover-category {
+    font-size: var(--typography-fontSize-coverCategory);
+    font-family: var(--ff-heading);
+    font-weight: var(--fw-bold);
+    color: var(--color-primary);
+    letter-spacing: 0.08em;
+    margin-bottom: var(--spacing-xl);
+    text-align: left;
+  }
+  .cover-title {
+    font-size: var(--typography-fontSize-coverTitle);
+    font-family: var(--ff-heading);
+    font-weight: var(--fw-bold);
+    color: var(--color-heading);
+    margin-bottom: var(--spacing-m);
+    text-align: left;
+  }
+  .cover-subtitle {
+    font-size: var(--typography-fontSize-subtitle);
+    color: var(--color-muted);
+    margin-bottom: var(--spacing-section);
+    text-align: left;
+  }
+  .cover-meta { font-size: var(--fs-small); color: var(--color-muted); text-align: left; }
+  .cover-meta p { margin-bottom: var(--spacing-xs); text-align: left; }
+
+  /* ===== TOC ===== */
+  .doc-toc {
+    padding: var(--spacing-block) 0;
+    border-bottom: 1px solid var(--color-border);
+    margin-bottom: var(--spacing-section);
+  }
+  .toc-title {
+    font-family: var(--ff-heading);
+    font-weight: var(--fw-bold);
+    font-size: var(--fs-h2);
+    color: var(--color-heading);
+    margin-bottom: var(--spacing-lg);
+  }
+  .toc-list, .toc-list ol, .toc-list ul { list-style: none; list-style-type: none; padding-left: var(--spacing-2xl); }
+  .toc-list li { margin-bottom: var(--spacing-s); text-indent: 0; font-size: var(--fs-body); }
+  .toc-list a { color: var(--color-primary); text-decoration: none; }
+
+  /* ===== Executive summary card ===== */
+  .executive-summary { width: 100%; border-collapse: collapse; margin-bottom: var(--spacing-section); }
+  .executive-summary td {
+    background: var(--color-surface);
+    border-left: 4px solid var(--color-primary);
+    padding: var(--spacing-block) var(--spacing-2xl);
+  }
+  .executive-summary .summary-title {
+    font-family: var(--ff-heading);
+    font-weight: var(--fw-bold);
+    font-size: var(--fs-h2);
+    color: var(--color-heading);
+    margin-bottom: var(--spacing-m);
+  }
+  .executive-summary p { margin-bottom: var(--spacing-paragraph); text-align: justify; }
+
+  /* ===== Body ===== */
+  .report-body { padding: var(--layout-marginTop) 0 var(--layout-marginBottom) 0; }
+  .report-body h2 {
+    font-size: var(--fs-h2);
+    font-family: var(--ff-heading);
+    font-weight: var(--fw-bold);
+    color: var(--color-heading);
+    margin-top: var(--spacing-section);
+    margin-bottom: var(--spacing-paragraph);
+    padding-bottom: var(--spacing-2xs);
+    border-bottom: 2px solid var(--color-primary);
+  }
+  .report-body h3 {
+    font-size: var(--fs-h3);
+    font-family: var(--ff-heading);
+    font-weight: var(--fw-bold);
+    color: var(--color-heading);
+    margin-top: var(--spacing-block);
+    margin-bottom: var(--spacing-paragraph);
+  }
+  .report-body p { margin-bottom: var(--spacing-paragraph); text-align: justify; }
+  .report-body ol, .report-body ul { margin-bottom: var(--spacing-paragraph); padding-left: var(--spacing-list); }
+  .report-body li { margin-bottom: var(--spacing-xs); text-align: justify; }
+
+  /* ===== 需求表格 ===== */
+  .req-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: var(--spacing-paragraph);
+    font-size: var(--fs-small);
+    line-height: var(--typography-lineHeight-compact);
+  }
+  .req-table th {
+    background: var(--color-surface);
+    color: var(--color-heading);
+    font-family: var(--ff-heading);
+    font-weight: var(--fw-bold);
+    border: 1px solid var(--color-border);
+    padding: var(--spacing-cell-y) var(--spacing-cell-x);
+    text-align: left;
+  }
+  .req-table td {
+    border: 1px solid var(--color-border);
+    padding: var(--spacing-cell-y) var(--spacing-cell-x);
+    text-align: left;
+    vertical-align: top;
+  }
+  .req-table .code-cell { font-weight: var(--fw-bold); color: var(--color-primary); white-space: nowrap; }
+
+  /* ===== 单段落提示 ===== */
+  .note-para {
+    border-left: 3px solid var(--color-primary);
+    background: var(--color-surface);
+    padding: var(--spacing-note-y) var(--spacing-note-x);
+    margin-bottom: var(--spacing-paragraph);
+    text-align: justify;
+  }
+  .note-para-warn {
+    border-left: 3px solid var(--color-emphasis);
+    background: var(--color-surface);
+    padding: var(--spacing-note-y) var(--spacing-note-x);
+    margin-bottom: var(--spacing-paragraph);
+    text-align: justify;
+  }
+
+  /* ===== 重点数据强调 ===== */
+  .data-emphasis { color: var(--color-emphasis); font-weight: var(--fw-bold); }
+
+  /* ===== 移动端适配（手机/平板竖屏） ===== */
+  html { -webkit-text-size-adjust: 100%; }
+  @media (max-width: 768px) {
+    :root {
+      /* 移动端改用 px，整体放大，保证手机上可读 */
+      --typography-fontSize-title: 26px;
+      --typography-fontSize-subtitle: 18px;
+      --typography-fontSize-h1: 22px;
+      --typography-fontSize-coverTitle: 24px;
+      --typography-fontSize-coverCategory: 14px;
+      --typography-fontSize-sectionHeader: 17px;
+      --typography-fontSize-h2: 18px;
+      --typography-fontSize-h3: 16px;
+      --typography-fontSize-body: 15px;
+      --typography-fontSize-small: 14px;
+      --typography-fontSize-tiny: 13px;
+      --typography-lineHeight-body: 1.75;
+      --layout-marginTop: 24px;
+      --layout-marginBottom: 24px;
+      --layout-marginLeft: 0;
+      --layout-marginRight: 0;
+      --page-content-width: 100%;
+      --spacing-section: 1.5em;
+    }
+    body {
+      padding-left: 14px;
+      padding-right: 14px;
+      overflow-wrap: break-word;
+    }
+    .report-cover {
+      padding: 36px 18px;
+      min-height: auto;
+    }
+    .cover-title { line-height: 1.35; }
+    .report-body { padding: 12px 0 24px 0; }
+    /* 表格超出屏幕时允许横向滑动，不挤压文字 */
+    .req-table {
+      display: block;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      line-height: 1.5;
+    }
+    /* 保持表头表体同一表格布局（列对齐），用单元格最小宽度触发横向滚动 */
+    .req-table th, .req-table td {
+      min-width: 96px;
+      padding: 8px 10px;
+      overflow-wrap: anywhere;
+    }
+    .req-table th:first-child, .req-table td:first-child { min-width: 110px; }
+    .executive-summary td { padding: 14px 16px; }
+    .toc-list, .toc-list ol, .toc-list ul { padding-left: 1em; }
+    .report-body ol, .report-body ul { padding-left: 1.3em; }
+    .note-para, .note-para-warn { padding: 10px 12px; }
+  }
+  @media (max-width: 480px) {
+    :root {
+      --typography-fontSize-coverTitle: 21px;
+      --typography-fontSize-subtitle: 16px;
+      --typography-fontSize-h2: 17px;
+      --typography-fontSize-body: 14.5px;
+    }
+  }
+  </style>
+</head>
+<body>
+
+  <!-- 封面 -->
+  <section role="cover" class="report-cover">
+    <p class="cover-category">产品需求文档 · PRD</p>
+    <h1 class="cover-title">打印管理系统<br>产品需求文档</h1>
+    <p class="cover-subtitle">码导入 · 产品关联 · 分子公司分配 · 工位打印 · 全程追溯</p>
+    <div class="cover-meta">
+      <p>文档版本：V1.1（修订稿，待评审）</p>
+      <p>编写日期：2026 年 9 月 29 日</p>
+      <p>面向读者：产品、开发、测试团队及外包供应商</p>
+      <p>V1.1 修订：系统形态明确为"管理后台 + 工位软件入口"整体系统；补打权限下沉子公司；子公司管理员本期启用；码导入增加"码—产品"对照关系文件；码格式限定 100 位以内数字字母。</p>
+    </div>
+  </section>
+
+  <!-- 正文 -->
+  <section role="body" class="report-body" data-page-restart="1">
+
+    <nav class="doc-toc" aria-label="文档目录">
+      <p class="toc-title">目录</p>
+      <ol class="toc-list">
+        <li><a href="#section-1">1. 术语定义</a></li>
+        <li><a href="#section-2">2. 项目概述</a></li>
+        <li><a href="#section-3">3. 用户角色与权限</a></li>
+        <li><a href="#section-4">4. 系统总体架构</a></li>
+        <li><a href="#section-5">5. 功能需求详述</a></li>
+        <li><a href="#section-6">6. 核心业务流程</a></li>
+        <li><a href="#section-7">7. 数据模型（核心实体）</a></li>
+        <li><a href="#section-8">8. 非功能需求</a></li>
+        <li><a href="#section-9">9. 验收标准（对应原始需求）</a></li>
+        <li><a href="#section-10">10. 待确认事项（Open Issues）</a></li>
+      </ol>
+    </nav>
+
+    <table class="executive-summary">
+      <tbody>
+      <tr><td>
+        <p class="summary-title">执行摘要</p>
+        <p>本系统是一套面向"总部 + 多分子公司"组织形态的<strong>整体打印管理系统</strong>，包含两个使用入口：<strong>管理后台</strong>（Web/H5，总部与子公司管理员经浏览器访问）与<strong>工位软件入口</strong>（安装在 Windows 10 工位电脑上的客户端软件，内置本地打印服务）。总部在管理后台统一导入 Excel 码清单及"码—产品"对照关系文件、管理产品并完成绑定，按"公司 + 产品"维度分配码量并随单下发打印模板；子公司工位操作员在工位软件入口执行打印，软件经内置本地打印服务直连本地打印机出纸。系统以<strong>防重复打印</strong>为核心控制点——一码正常只允许打印一次，补打为唯一例外（权限下沉到子公司管理员，必填原因、全程留痕）；作废为终态操作、不可恢复。服务端部署于远程云服务器，管理后台兼容 Win10 主流浏览器，工位软件提供 Win10 安装包。</p>
+        <p>文档共 10 章：第 1–4 章为术语、背景、角色与架构，第 5 章为功能需求主体（10 组功能项、FR-01 至 FR-10，按 P0/P1 划分优先级），第 6–7 章为码状态机与数据模型，第 8–10 章为非功能需求、验收标准与待确认事项。打印机具体型号清单由甲方后续提供，适配验证作为 P0 验收项管理。</p>
+      </td></tr>
+      </tbody>
+    </table>
+
+    <main>
+
+      <h2 id="section-1">1. 术语定义</h2>
+      <table class="req-table">
+        <thead><tr><th style="width:18%">术语</th><th>定义</th></tr></thead>
+        <tbody>
+          <tr><td>码</td><td>系统管理的最小打印单元，通常为一物一码场景下的二维码/条码字符串（100 位以内数字字母），由总部统一导入生成</td></tr>
+          <tr><td>码池</td><td>总部导入后尚未分配给子公司的码集合（总部库存）</td></tr>
+          <tr><td>工位</td><td>子公司内的具体作业位置，是打印操作的最小执行单元，每个工位绑定一名或多名操作员</td></tr>
+          <tr><td>管理后台</td><td>部署于远程服务端的 Web/H5 管理界面，总部与子公司管理员通过浏览器访问，完成管理与查询操作</td></tr>
+          <tr><td>工位软件入口</td><td>安装在工位 Windows 10 电脑上的系统软件入口（客户端），集成操作界面与本地打印服务，负责执行打印并驱动本地打印机</td></tr>
+          <tr><td>补打</td><td>对已打印过的码在特定条件下重新打印的行为，是防重复打印规则下唯一允许的再次打印途径</td></tr>
+          <tr><td>作废</td><td>将某个码标记为失效、禁止再打印的操作，作废后不可恢复</td></tr>
+          <tr><td>打印模板</td><td>定义码在标签纸上的排版规则（二维码、文本、公司名、产品名等元素的位置与样式）</td></tr>
+          <tr><td>总部</td><td>拥有系统最高管理权限的组织节点，负责码导入、产品管理、码分配与模板管理</td></tr>
+        </tbody>
+      </table>
+
+      <h2 id="section-2">2. 项目概述</h2>
+      <p>本章说明系统建设的业务背景、建设目标与本期建设边界。</p>
+
+      <h3>2.1 项目背景</h3>
+      <p>企业下辖总部与多个分子公司，产品上使用的"码"（一物一码）由总部统一采购或生成，再分发到各分子公司在生产/包装环节打印贴附。当前缺少统一系统管理码的导入、分配、打印与追溯，存在码量底数不清、重复打印、乱打乱用、责任无法追溯等问题。</p>
+      <p>本项目拟建设一套整体打印管理系统：服务端部署在远程服务器，总部及子公司管理员通过浏览器访问管理后台完成管理与查询；工位通过安装在 Windows 10 电脑上的软件入口（内置本地打印服务）执行打印，直连本地打印机完成出标签，实现"码从总部导入、按产品按公司分配、工位打印留痕、防重复打印、可补打可作废且全程有记录"的闭环管理。</p>
+
+      <h3>2.2 项目目标</h3>
+      <ol>
+        <li><strong>账实一致</strong>：总部可实时查看每个分子公司、每个产品的码库存量与已打印量，杜绝码资源失控。</li>
+        <li><strong>一码一打</strong>：任何码正常情况下只允许打印一次，从机制上杜绝重复打印导致的窜货与造假风险。</li>
+        <li><strong>全程留痕</strong>：从导入、分配、打印、补打到作废，每一次操作均记录操作人、时间、工位与前后状态，满足审计与追责需要。</li>
+        <li><strong>开箱即打</strong>：工位电脑安装软件入口后即可直接驱动本地打印机打印，操作界面简洁，日常作业无需复杂配置。</li>
+        <li><strong>模板统一</strong>：打印模板由总部管理员统一管理与下发，各公司使用总部授权的模板，保证全集团标签格式一致。</li>
+      </ol>
+
+      <h2 id="section-3">3. 用户角色与权限</h2>
+      <table class="req-table">
+        <thead><tr><th style="width:16%">角色</th><th style="width:16%">归属</th><th style="width:30%">核心职责</th><th>关键权限</th></tr></thead>
+        <tbody>
+          <tr><td>总部管理员</td><td>总部</td><td>系统全部管理职能</td><td>码导入、产品管理、码绑定、码分配、模板管理、报表查看、组织结构管理、账号管理、补打、作废</td></tr>
+          <tr><td>子公司管理员</td><td>分子公司</td><td>本公司日常管理（本期启用）</td><td>查看本公司码量与打印情况、查看本公司操作记录、管理本公司工位与操作员、对本公司码执行补打与作废（须填原因）</td></tr>
+          <tr><td>工位操作员</td><td>分子公司·工位</td><td>日常打印作业</td><td>在工位软件入口查看本公司被分配的产品与码、执行打印、标记打印失败</td></tr>
+        </tbody>
+      </table>
+      <p class="note-para">&nbsp;&nbsp;<strong>权限矩阵原则——数据按组织隔离</strong>：子公司账号只能看到本公司的码、模板与记录；工位操作员只能操作本工位的打印任务；总部管理员可见全部数据。所有列表查询默认按此规则过滤，越权请求一律拒绝。<strong>补打权限已确认下沉到子公司</strong>：子公司管理员可直接对本公司码执行补打，无需总部审批。</p>
+
+      <h2 id="section-4">4. 系统总体架构</h2>
+      <p>本章描述系统的三层部署架构与打印链路的技术原理。</p>
+
+      <h3>4.1 部署架构</h3>
+      <p>系统采用"远程服务端 + 管理后台（Web/H5）+ 工位软件入口"三层结构：</p>
+      <table class="req-table">
+        <thead><tr><th style="width:16%">层级</th><th style="width:24%">部署位置</th><th style="width:26%">组成</th><th>说明</th></tr></thead>
+        <tbody>
+          <tr><td>服务端</td><td>远程云服务器</td><td>Web API 服务、数据库、文件/对象存储</td><td>所有业务数据与码库集中存储，各公司通过互联网访问</td></tr>
+          <tr><td>管理后台</td><td>浏览器（Win10 Chrome/Edge）</td><td>Web/H5 管理界面</td><td>总部与子公司管理员的管理与查询入口，免安装，通过 HTTPS 访问远程服务端</td></tr>
+          <tr><td>工位软件入口</td><td>工位 Win10 电脑</td><td>客户端软件（操作界面 + 本地打印服务）</td><td>系统的软件入口；操作员在此执行打印/补打，内置本地打印服务驱动 USB/网口打印机出纸</td></tr>
+        </tbody>
+      </table>
+
+      <h2 id="section-5">5. 功能需求详述</h2>
+      <p>本章按功能模块拆分需求项，统一采用"编号 + 需求描述 + 优先级"的结构；P0 为本期必须交付项，P1 为可延至下一迭代项。</p>
+
+      <h3>5.1 组织结构管理（FR-01）</h3>
+      <table class="req-table">
+        <thead><tr><th style="width:14%">编号</th><th>需求项</th><th style="width:10%">优先级</th></tr></thead>
+        <tbody>
+          <tr><td class="code-cell">FR-01-01</td><td>支持创建/编辑/停用分子公司；公司信息含名称、编码、联系人、所在地区</td><td>P0</td></tr>
+          <tr><td class="code-cell">FR-01-02</td><td>支持在每个公司下创建/编辑/停用工位；工位信息含工位名称、编码、所属公司、绑定打印机、绑定操作员</td><td>P0</td></tr>
+          <tr><td class="code-cell">FR-01-03</td><td>停用公司/工位后不可再被分配新码、不可再执行打印，历史数据保留可查</td><td>P0</td></tr>
+          <tr><td class="code-cell">FR-01-04</td><td>组织树在总部侧以树形结构展示，支持按公司汇总下钻查看工位</td><td>P1</td></tr>
+        </tbody>
+      </table>
+      <p class="note-para">&nbsp;&nbsp;工位是操作留痕的核心维度：所有打印、补打、作废记录必须精确到"操作员 + 工位 + 打印机"。</p>
+
+      <h3>5.2 产品管理（FR-02）</h3>
+      <table class="req-table">
+        <thead><tr><th style="width:14%">编号</th><th>需求项</th><th style="width:10%">优先级</th></tr></thead>
+        <tbody>
+          <tr><td class="code-cell">FR-02-01</td><td>总部管理员可创建/编辑/停用产品；产品信息含名称、编码、规格、关联默认打印模板</td><td>P0</td></tr>
+          <tr><td class="code-cell">FR-02-02</td><td>停用产品后不可再绑定新码、不可再分配，已分配未打印的码由总部回收或作废处理</td><td>P0</td></tr>
+          <tr><td class="code-cell">FR-02-03</td><td>产品列表支持按名称/编码搜索，并显示各产品累计导入码量、已分配量、已打印量</td><td>P1</td></tr>
+        </tbody>
+      </table>
+
+      <h3>5.3 码导入（FR-03）</h3>
+      <table class="req-table">
+        <thead><tr><th style="width:14%">编号</th><th>需求项</th><th style="width:10%">优先级</th></tr></thead>
+        <tbody>
+          <tr><td class="code-cell">FR-03-01</td><td>总部管理员可下载标准 Excel 导入模板。导入包含两类文件，<strong>需同时导入、成对校验</strong>：① 码清单文件（列：码值）；② "码—产品"对照关系文件（列：码值、产品编码）</td><td>P0</td></tr>
+          <tr><td class="code-cell">FR-03-02</td><td>码值格式规范：<strong>100 位以内、仅限数字与字母</strong>；导入时逐行校验格式、长度、唯一性；单次建议支持 <span class="data-emphasis">10 万行级</span></td><td>P0</td></tr>
+          <tr><td class="code-cell">FR-03-03</td><td>码值全库唯一：与已有码重复的行整批拒绝或按行跳过（策略可配置，默认整批拒绝并输出错误清单）</td><td>P0</td></tr>
+          <tr><td class="code-cell">FR-03-04</td><td>导入完成后生成导入批次记录：批次号、两个文件名、总行数、成功数、失败数、失败明细下载（含对照关系中码值缺失、产品编码不存在等错误类型）、操作人、时间</td><td>P0</td></tr>
+          <tr><td class="code-cell">FR-03-05</td><td>导入成功且对照关系校验通过的码按对照关系完成产品绑定并进入总部码池，初始状态为"待分配"；对照关系中引用了不存在产品的行计入失败明细，不入库</td><td>P0</td></tr>
+        </tbody>
+      </table>
+
+      <h3>5.4 码与产品绑定（FR-04）</h3>
+      <table class="req-table">
+        <thead><tr><th style="width:14%">编号</th><th>需求项</th><th style="width:10%">优先级</th></tr></thead>
+        <tbody>
+          <tr><td class="code-cell">FR-04-01</td><td>码在导入时通过"码—产品"对照关系文件完成产品绑定；也支持导入后在码池中按批次批量绑定/换绑产品</td><td>P0</td></tr>
+          <tr><td class="code-cell">FR-04-02</td><td>已分配的码不允许换绑产品；已打印的码不允许任何绑定变更</td><td>P0</td></tr>
+          <tr><td class="code-cell">FR-04-03</td><td>一个码同一时间只能属于一个产品（一码一产品）</td><td>P0</td></tr>
+        </tbody>
+      </table>
+
+      <h3>5.5 码分配（FR-05）</h3>
+      <table class="req-table">
+        <thead><tr><th style="width:14%">编号</th><th>需求项</th><th style="width:10%">优先级</th></tr></thead>
+        <tbody>
+          <tr><td class="code-cell">FR-05-01</td><td>总部管理员按"公司 + 产品"维度将码池中的码分配给分子公司：选择目标公司、产品、分配数量，系统从码池自动取码（默认按导入批次先进先出）</td><td>P0</td></tr>
+          <tr><td class="code-cell">FR-05-02</td><td>支持选择特定批次/码段进行定向分配</td><td>P1</td></tr>
+          <tr><td class="code-cell">FR-05-03</td><td>分配生成分配单：单号、公司、产品、码数量、码段范围、分配人、分配时间、携带的打印模板</td><td>P0</td></tr>
+          <tr><td class="code-cell">FR-05-04</td><td>分配成功后码状态置为"已分配"，归属公司可见；总部可将未打印的码回收（回收后码回到码池，状态回"待分配"），已打印的码不可回收</td><td>P0</td></tr>
+          <tr><td class="code-cell">FR-05-05</td><td>总部看板可查看：各公司、各产品的"已分配未打印"码量与"已打印"码量，支持导出 Excel</td><td>P0</td></tr>
+        </tbody>
+      </table>
+
+      <h3>5.6 模板管理（FR-06）</h3>
+      <table class="req-table">
+        <thead><tr><th style="width:14%">编号</th><th>需求项</th><th style="width:10%">优先级</th></tr></thead>
+        <tbody>
+          <tr><td class="code-cell">FR-06-01</td><td>总部管理员可新建/编辑/停用打印模板；模板定义纸张尺寸、元素清单（二维码/条码、产品名、公司名、批次号、打印日期等）及其坐标、字体、字号</td><td>P0</td></tr>
+          <tr><td class="code-cell">FR-06-02</td><td>模板支持可视化编辑（拖拽定位 + 实时预览），并提供打印预览功能</td><td>P1</td></tr>
+          <tr><td class="code-cell">FR-06-03</td><td>模板带版本号：模板修改后生成新版本，历史版本保留；已被分配单引用的模板版本内容冻结，不受后续修改影响</td><td>P0</td></tr>
+          <tr><td class="code-cell">FR-06-04</td><td>模板随码分配携带：分配码时必须指定（默认取产品绑定的默认模板）一个模板版本，子公司工位打印时强制使用该版本，子公司不可修改模板</td><td>P0</td></tr>
+          <tr><td class="code-cell">FR-06-05</td><td>模板中的动态字段（如产品名、公司名、码值）由系统在打印时自动填充</td><td>P0</td></tr>
+        </tbody>
+      </table>
+
+      <h3>5.7 打印管理（FR-07）</h3>
+      <table class="req-table">
+        <thead><tr><th style="width:14%">编号</th><th>需求项</th><th style="width:10%">优先级</th></tr></thead>
+        <tbody>
+          <tr><td class="code-cell">FR-07-01</td><td>工位操作员在工位软件入口中按产品查看本公司"已分配未打印"的码，选择数量（或扫码定位单个码）发起打印</td><td>P0</td></tr>
+          <tr><td class="code-cell">FR-07-02</td><td>打印时系统自动渲染"分配单携带的模板版本 + 码数据"，经工位软件内置的本地打印服务驱动工位绑定的打印机出纸，支持静默打印</td><td>P0</td></tr>
+          <tr><td class="code-cell">FR-07-03</td><td><strong>防重复打印</strong>：打印采用"预占—确认"机制——点击打印即锁定所选码并置为"打印中"，打印确认（或本地打印服务返回成功回执）后置为"已打印"；处于"已打印"状态的码再次发起打印时系统直接拒绝</td><td>P0</td></tr>
+          <tr><td class="code-cell">FR-07-04</td><td>打印异常（缺纸、离线、打印服务未启动等）时操作员可对"打印中"的码执行"标记失败"，码回退为"已分配未打印"，可再次正常打印，不算补打</td><td>P0</td></tr>
+          <tr><td class="code-cell">FR-07-05</td><td><strong>补打</strong>：总部管理员与<strong>子公司管理员</strong>均可对"已打印"的码发起补打（<strong>补打权限已确认下沉到子公司</strong>，子公司管理员对本公司码直接可补打，无需总部审批；工位操作员无补打权限）；补打必须填写原因；补打次数、补打人、补打时间全程记录</td><td>P0</td></tr>
+          <tr><td class="code-cell">FR-07-06</td><td><strong>作废</strong>：总部管理员与子公司管理员可对权限范围内的码执行作废（子公司管理员仅限本公司码），作废须填写原因并留痕；作废后的码在任何工位不可见、不可打印、不可恢复</td><td>P0</td></tr>
+          <tr><td class="code-cell">FR-07-07</td><td>每一次打印动作（含正常打印、补打、打印失败）生成打印记录：码值、产品、公司、工位、操作员、打印机、模板版本、打印时间、打印类型（首次/补打）、结果</td><td>P0</td></tr>
+          <tr><td class="code-cell">FR-07-08</td><td>支持批量打印（一次任务连续打印多个码）与单码补打；批量任务逐码记录</td><td>P1</td></tr>
+        </tbody>
+      </table>
+
+      <h3>5.8 统计报表（FR-08）</h3>
+      <table class="req-table">
+        <thead><tr><th style="width:14%">编号</th><th>需求项</th><th style="width:10%">优先级</th></tr></thead>
+        <tbody>
+          <tr><td class="code-cell">FR-08-01</td><td>总部看板：按公司/按产品展示码量四态分布（待分配、已分配未打印、已打印、已作废），支持时间筛选</td><td>P0</td></tr>
+          <tr><td class="code-cell">FR-08-02</td><td>打印明细表：按公司、工位、操作员、产品、时间段筛选打印记录，可导出 Excel</td><td>P0</td></tr>
+          <tr><td class="code-cell">FR-08-03</td><td>补打/作废台账：单独列示全部补打与作废记录及原因，供审计</td><td>P1</td></tr>
+          <tr><td class="code-cell">FR-08-04</td><td>子公司管理员仅能查看本公司的上述报表</td><td>P0</td></tr>
+        </tbody>
+      </table>
+
+      <h3>5.9 打印机对接（FR-09）</h3>
+      <table class="req-table">
+        <thead><tr><th style="width:14%">编号</th><th>需求项</th><th style="width:10%">优先级</th></tr></thead>
+        <tbody>
+          <tr><td class="code-cell">FR-09-01</td><td>系统通过工位软件内置的本地打印服务驱动打印机，软件界面与本地打印服务通过本地回环 WebSocket/HTTP 通信</td><td>P0</td></tr>
+          <tr><td class="code-cell">FR-09-02</td><td>工位设置中可选择/绑定该工位默认打印机（列出本机打印机清单）</td><td>P0</td></tr>
+          <tr><td class="code-cell">FR-09-03</td><td>打印前检测本地打印服务状态与打印机在线状态，异常时给出明确提示（打印服务未启动/打印机离线）</td><td>P0</td></tr>
+          <tr><td class="code-cell">FR-09-04</td><td>兼容甲方后续提供的打印机型号清单：型号提供后须完成适配验证并在测试报告中给出"型号—驱动—纸张规格—验证结论"适配矩阵；新型号接入以驱动安装为基础，原则上无需修改系统代码</td><td>P0</td></tr>
+        </tbody>
+      </table>
+
+      <h3>5.10 操作日志与审计（FR-10）</h3>
+      <table class="req-table">
+        <thead><tr><th style="width:14%">编号</th><th>需求项</th><th style="width:10%">优先级</th></tr></thead>
+        <tbody>
+          <tr><td class="code-cell">FR-10-01</td><td>系统内所有关键操作（登录、导入、分配、回收、打印、补打、作废、模板变更、账号变更）写入操作日志：操作人、角色、所属公司、工位（如适用）、操作类型、操作对象、操作时间、IP、结果</td><td>P0</td></tr>
+          <tr><td class="code-cell">FR-10-02</td><td>日志仅总部管理员可查，不可篡改、不可删除，保留期不少于 2 年</td><td>P0</td></tr>
+          <tr><td class="code-cell">FR-10-03</td><td>码的全生命周期视图：输入任一码值，展示其从导入到当前状态的完整时间线（导入→绑定→分配→打印→补打/作废）</td><td>P1</td></tr>
+        </tbody>
+      </table>
+
+      <h2 id="section-6">6. 核心业务流程</h2>
+      <p>本章以码状态机为核心，描述正常打印主流程与补打/作废异常流程。</p>
+
+      <h3>6.1 码状态机</h3>
+      <table class="req-table">
+        <thead><tr><th style="width:22%">当前状态</th><th style="width:22%">触发动作</th><th style="width:22%">目标状态</th><th>执行角色</th></tr></thead>
+        <tbody>
+          <tr><td>待分配（总部码池）</td><td>分配</td><td>已分配</td><td>总部管理员</td></tr>
+          <tr><td>已分配</td><td>打印（预占锁定）</td><td>打印中</td><td>工位操作员</td></tr>
+          <tr><td>打印中</td><td>打印成功确认</td><td>已打印</td><td>系统/操作员</td></tr>
+          <tr><td>打印中</td><td>标记打印失败</td><td>已分配</td><td>工位操作员</td></tr>
+          <tr><td>已打印</td><td>补打</td><td>已打印（补打次数+1）</td><td>总部/子公司管理员</td></tr>
+          <tr><td>待分配 / 已分配 / 已打印</td><td>作废</td><td>已作废（终态）</td><td>总部/子公司管理员</td></tr>
+          <tr><td>已分配</td><td>总部回收</td><td>待分配</td><td>总部管理员</td></tr>
+        </tbody>
+      </table>
+      <p class="note-para-warn">&nbsp;&nbsp;<strong>已作废为终态</strong>，不允许流转到任何其他状态。</p>
+
+      <h3>6.2 主流程（正常打印）</h3>
+      <ol>
+        <li>总部管理员在管理后台同时导入码清单与"码—产品"对照关系文件 → 系统成对校验后码进入码池并完成产品绑定。</li>
+        <li>总部管理员按"公司 + 产品 + 数量"分配码，并随单携带打印模板版本。</li>
+        <li>子公司工位操作员登录工位软件入口，选择产品，查看本公司可打印码。</li>
+        <li>选择数量发起打印 → 系统锁定码并渲染模板 → 工位软件内置本地打印服务驱动打印机出纸。</li>
+        <li>打印成功后码置为"已打印"，生成打印记录；总部看板实时更新。</li>
+      </ol>
+
+      <h3>6.3 异常流程（补打/作废）</h3>
+      <ul>
+        <li><strong>补打</strong>：已打印的码若标签损坏/丢失，由总部管理员或本公司子公司管理员发起补打（必填原因）→ 系统再次渲染原模板出纸 → 补打记录入台账。</li>
+        <li><strong>作废</strong>：码判定不再使用（如整批报废）时由总部管理员或本公司子公司管理员作废（必填原因）→ 码全集团不可打印，记录入台账。</li>
+      </ul>
+
+      <h2 id="section-7">7. 数据模型（核心实体）</h2>
+      <table class="req-table">
+        <thead><tr><th style="width:20%">实体</th><th style="width:44%">关键字段</th><th>关系</th></tr></thead>
+        <tbody>
+          <tr><td>公司 Company</td><td>公司编码、名称、状态</td><td>下辖多个工位</td></tr>
+          <tr><td>工位 Workstation</td><td>工位编码、名称、所属公司、绑定打印机、状态</td><td>隶属公司；关联操作员</td></tr>
+          <tr><td>用户 User</td><td>账号、姓名、角色、所属公司、状态</td><td>归属公司；可绑定工位</td></tr>
+          <tr><td>产品 Product</td><td>产品编码、名称、规格、默认模板、状态</td><td>被码引用</td></tr>
+          <tr><td>码 Code</td><td>码值（唯一，100 位以内数字字母）、状态、所属产品、归属公司、导入批次、补打次数</td><td>隶属产品；被分配/打印记录引用</td></tr>
+          <tr><td>导入批次 ImportBatch</td><td>批次号、码清单文件名、对照关系文件名、成功/失败数、操作人、时间</td><td>产生多个码</td></tr>
+          <tr><td>分配单 AllocationOrder</td><td>单号、公司、产品、码数量、码段、模板版本、分配人、时间</td><td>关联多个码</td></tr>
+          <tr><td>打印模板 Template</td><td>模板编码、名称、版本、纸张规格、元素定义 JSON、状态</td><td>被产品/分配单引用</td></tr>
+          <tr><td>打印记录 PrintLog</td><td>码值、打印类型（首次/补打）、工位、操作员、打印机、模板版本、时间、结果</td><td>关联码</td></tr>
+          <tr><td>操作日志 AuditLog</td><td>操作人、角色、动作、对象、时间、IP、结果</td><td>独立审计表</td></tr>
+        </tbody>
+      </table>
+
+      <h2 id="section-8">8. 非功能需求</h2>
+      <table class="req-table">
+        <thead><tr><th style="width:14%">类别</th><th>需求</th></tr></thead>
+        <tbody>
+          <tr><td>部署</td><td>服务端部署于远程云服务器（Linux），提供 HTTPS 访问；建议配置数据库每日自动备份，保留 30 天</td></tr>
+          <tr><td>客户端兼容</td><td>管理后台兼容 Windows 10 下 Chrome / Edge 主流版本；工位软件入口提供 Win10 安装包（32/64 位），安装后自动注册本地打印服务</td></tr>
+          <tr><td>性能</td><td>码库支持百万级容量；列表查询 3 秒内响应；单次批量打印 500 码任务 60 秒内完成下发</td></tr>
+          <tr><td>并发</td><td>支持不少于 50 个工位同时在线操作；同一码的打印操作通过服务端锁机制保证并发安全</td></tr>
+          <tr><td>安全</td><td>全链路 HTTPS；账号密码加密存储；数据按组织隔离；打印记录与操作日志不可篡改</td></tr>
+          <tr><td>可用性</td><td>系统可用性目标 99.5%；工位软件内本地打印服务断线自动重连并提示</td></tr>
+          <tr><td>可扩展</td><td>打印适配层预留打印机驱动插件机制，便于接入后续新增型号；预留对 ERP/WMS 的数据接口</td></tr>
+        </tbody>
+      </table>
+
+      <h2 id="section-9">9. 验收标准（对应原始需求）</h2>
+      <table class="req-table">
+        <thead><tr><th style="width:34%">原始需求</th><th>验收要点</th></tr></thead>
+        <tbody>
+          <tr><td>组织结构 + 工位 + 操作记录</td><td>可建立多级公司及工位；打印/补打/作废记录可精确到工位与操作员，记录不可删除</td></tr>
+          <tr><td>总部导入 Excel、产品管理、码分配、码量统计</td><td>码清单与"码—产品"对照关系文件同时导入、成对校验，含批次记录；按"公司 + 产品"分配；看板准确展示各公司码量与打印情况</td></tr>
+          <tr><td>软件直连打印、模板管理与携带、打印机兼容</td><td>工位软件入口经内置本地打印服务静默打印；模板由总部管理且随分配下发、子公司不可改；甲方提供型号清单后适配验证通过</td></tr>
+          <tr><td>防重复打印</td><td>已打印的码再次打印被系统拒绝；补打为唯一例外（子公司管理员可直接补打）且必填原因并留痕</td></tr>
+          <tr><td>远程服务端 + Win10 兼容</td><td>服务端部署于远程服务器并通过 HTTPS 访问；管理后台在 Win10 Chrome/Edge、工位软件在 Win10 验证通过</td></tr>
+        </tbody>
+      </table>
+
+      <h2 id="section-10">10. 待确认事项（Open Issues）</h2>
+      <table class="req-table">
+        <thead><tr><th style="width:10%">编号</th><th style="width:44%">事项</th><th style="width:26%">影响</th><th>责任方</th></tr></thead>
+        <tbody>
+          <tr><td class="code-cell">OI-01</td><td>打印机具体型号清单（甲方后续提供）</td><td>决定适配验证范围与纸张规格</td><td>甲方</td></tr>
+          <tr><td class="code-cell">OI-02</td><td>码单批最大数量上限（格式规范已确认：100 位以内数字字母）</td><td>影响导入性能设计与批次限制</td><td>甲方</td></tr>
+        </tbody>
+      </table>
+
+    </main>
+  </section>
+</body>
+</html>
