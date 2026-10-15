@@ -14,6 +14,7 @@ class AllocationOrder(PkMixin, TimestampMixin, Base):
     __tablename__ = "allocation_order"
 
     order_no: Mapped[str] = mapped_column(String(32), nullable=False, unique=True)
+    production_batch_no: Mapped[str | None] = mapped_column(String(64))
     company_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("company.id"), nullable=False)
     product_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("product.id"), nullable=False)
     code_count: Mapped[int] = mapped_column(Integer, nullable=False)

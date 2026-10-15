@@ -30,6 +30,8 @@ def list_users(db: Session, scope: Scope, *, company_id: int | None = None) -> l
     stmt = select(User).order_by(User.username)
     # 组织隔离：非总部强制限定本公司（R7）
     stmt = scope.apply_company_filter(stmt, User.company_id)
+    if not scope.is_hq:
+        stmt = stmt.where(User.role == "operator")
     if company_id is not None:
         scope.assert_can_access_company(company_id)
         stmt = stmt.where(User.company_id == company_id)

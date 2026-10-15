@@ -6,11 +6,12 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.core.db import get_db
-from app.core.deps import ClientIp, CurrentUser, HqAdmin
+from app.core.deps import ClientIp, HqAdmin
 from app.core.scope import Scope
 from app.models.allocation_order import AllocationOrder
 from app.models.company import Company
 from app.models.product import Product
+from app.models.template import Template, TemplateVersion
 from app.schemas.allocation import AllocationCreate, AllocationCreatedOut, AllocationOrderOut
 from app.services import allocation as allocation_service
 from app.services import audit
@@ -23,9 +24,12 @@ DbSession = Annotated[Session, Depends(get_db)]
 def serialize(db: Session, order: AllocationOrder) -> AllocationOrderOut:
     company = db.get(Company, order.company_id)
     product = db.get(Product, order.product_id)
+    version = db.get(TemplateVersion, order.template_version_id)
+    template = db.get(Template, version.template_id) if version else None
     return AllocationOrderOut(
         id=order.id,
         order_no=order.order_no,
+        production_batch_no=order.production_batch_no,
         company_id=order.company_id,
         company_name=company.name if company else None,
         product_id=order.product_id,
@@ -34,6 +38,7 @@ def serialize(db: Session, order: AllocationOrder) -> AllocationOrderOut:
         code_range_from=order.code_range_from,
         code_range_to=order.code_range_to,
         template_version_id=order.template_version_id,
+        template_name=template.name if template else None,
         allocated_by=order.allocated_by,
         allocated_at=order.allocated_at,
         status=order.status,
@@ -42,7 +47,7 @@ def serialize(db: Session, order: AllocationOrder) -> AllocationOrderOut:
 
 @router.get("", response_model=list[AllocationOrderOut])
 def list_allocations(
-    user: CurrentUser,
+    user: HqAdmin,
     db: DbSession,
     company_id: int | None = None,
     limit: int = 100,
@@ -61,9 +66,7 @@ def list_allocations(
 
 
 @router.post("", response_model=AllocationCreatedOut, status_code=201)
-def create_allocation(
-    payload: AllocationCreate, user: HqAdmin, db: DbSession, ip: ClientIp
-):
+def create_allocation(payload: AllocationCreate, user: HqAdmin, db: DbSession, ip: ClientIp):
     """按"公司 + 产品 + 数量"分配码。可用量不足返回 409 并带 details.available。"""
     result = allocation_service.allocate(
         db,
@@ -72,6 +75,7 @@ def create_allocation(
         quantity=payload.quantity,
         operator_id=user.id,
         template_version_id=payload.template_version_id,
+        production_batch_no=payload.production_batch_no,
         batch_id=payload.batch_id,
         code_range_from=payload.code_range_from,
         code_range_to=payload.code_range_to,
@@ -88,9 +92,7 @@ def create_allocation(
         ip=ip,
     )
     db.commit()
-    return AllocationCreatedOut(
-        order=serialize(db, result.order), allocated=result.allocated
-    )
+    return AllocationCreatedOut(order=serialize(db, result.order), allocated=result.allocated)
 
 
 @router.post("/{order_id}/reclaim", response_model=AllocationOrderOut)

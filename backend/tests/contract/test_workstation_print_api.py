@@ -303,3 +303,55 @@ class TestConfirmFromNonHoldingWorkstation:
             },
         )
         assert resp.status_code == 403
+
+class TestCurrentTemplate:
+    def test_preview_does_not_reserve_code_or_serial(
+        self, client, db, operator, workstation, product, printable, template_version
+    ):
+        from app.models.print_identity import PrintIdentity
+        from app.models.template import TemplateVersion
+        from sqlalchemy import func
+        template_version.elements_json = {
+            'paper_width_mm': 40, 'paper_height_mm': 55,
+            'elements': [{'type': 'date', 'x': 1, 'y': 1, 'font_size': 3},
+                         {'type': 'serial', 'x': 1, 'y': 5, 'font_size': 3}]
+        }
+        db.flush()
+        # 产品已有新版时仍展示分配单冻结的旧版。
+        db.add(TemplateVersion(
+            template_id=template_version.template_id, version_no=template_version.version_no + 1,
+            paper_width_mm=60, paper_height_mm=80,
+            elements_json={'paper_width_mm': 60, 'paper_height_mm': 80, 'elements': []}
+        ))
+        db.flush()
+        before = db.scalar(select(func.count()).select_from(PrintIdentity))
+        response = client.get(
+            f'/api/v1/workstation/template?workstation_id={workstation.id}&product_id={product.id}',
+            headers=auth_header(operator),
+        )
+        assert response.status_code == 200
+        body = response.json()
+        assert body['version_no'] == template_version.version_no
+        assert body['data']['code_value'] == 'K001'
+        assert body['elements_json'] == template_version.elements_json
+        assert not body['data'].get('serial_no')
+        assert db.scalar(select(func.count()).select_from(PrintIdentity)) == before
+        assert db.scalar(select(Code).where(Code.code_value == 'K001')).status == 'allocated'
+
+    def test_empty_queue(self, client, operator, workstation, product):
+        response = client.get(
+            f'/api/v1/workstation/template?workstation_id={workstation.id}&product_id={product.id}',
+            headers=auth_header(operator),
+        )
+        assert response.status_code == 200
+        assert response.json() is None
+
+    def test_other_company_forbidden(self, client, db, operator, other_company, product):
+        station = Workstation(code='PREVIEW-OTHER', name='其他公司', company_id=other_company.id)
+        db.add(station)
+        db.flush()
+        response = client.get(
+            f'/api/v1/workstation/template?workstation_id={station.id}&product_id={product.id}',
+            headers=auth_header(operator),
+        )
+        assert response.status_code == 403

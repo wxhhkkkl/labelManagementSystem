@@ -7,16 +7,15 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.db import get_db
-from app.core.deps import ClientIp, CurrentUser
+from app.core.deps import ClientIp, CurrentUser, HqAdmin
 from app.core.scope import Scope
 from app.models.code import Code
 from app.models.workstation import Workstation
 from app.schemas.allocation import CodeOut
-from app.schemas.common import Page
 from app.schemas.audit import CodeDetailOut, TimelineEntryOut
+from app.schemas.common import Page
 from app.schemas.reprint import ReprintRequest, ReprintTaskOut, VoidRequest, VoidResponse
-from app.services import audit
-from app.services import code_timeline
+from app.services import audit, code_timeline
 from app.services import reprint as reprint_service
 from app.services import void as void_service
 
@@ -58,9 +57,7 @@ def list_codes(
     if status is not None:
         stmt = stmt.where(Code.status == status)
 
-    total = db.execute(
-        select(func.count()).select_from(stmt.subquery())
-    ).scalar_one()
+    total = db.execute(select(func.count()).select_from(stmt.subquery())).scalar_one()
 
     rows = db.execute(
         stmt.order_by(Code.id).offset((page - 1) * page_size).limit(page_size)
@@ -117,9 +114,7 @@ def request_reprint(
 
 
 @router.post("/void", response_model=VoidResponse)
-def void_codes(
-    payload: VoidRequest, user: CurrentUser, db: DbSession, ip: ClientIp
-) -> VoidResponse:
+def void_codes(payload: VoidRequest, user: HqAdmin, db: DbSession, ip: ClientIp) -> VoidResponse:
     """批量作废（FR-057 ~ FR-060）。
 
     混入他公司码整体拒绝；混入已作废码按幂等跳过并在 `skipped` 中列出。
@@ -142,7 +137,7 @@ def void_codes(
 
 
 @router.get("/{code_value}", response_model=CodeDetailOut)
-def get_code_detail(code_value: str, user: CurrentUser, db: DbSession) -> CodeDetailOut:
+def get_code_detail(code_value: str, user: HqAdmin, db: DbSession) -> CodeDetailOut:
     """码详情与全生命周期时间线（FR-064）。
 
     可见范围按**数据归属**判定，与审计日志（仅总部可查）不同：

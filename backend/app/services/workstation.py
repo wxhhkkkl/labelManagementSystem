@@ -9,7 +9,9 @@ from app.core.config import get_settings
 from app.core.errors import ApiError, ErrorCode
 from app.core.scope import Scope
 from app.models.base import utcnow
+from app.models.code import Code
 from app.models.company import Company
+from app.models.print_task import PrintTask
 from app.models.user import User
 from app.models.workstation import Workstation, WorkstationOperator
 
@@ -52,9 +54,7 @@ def list_workstations(
 
 def _set_operators(db: Session, ws: Workstation, operator_ids: list[int]) -> None:
     """重建工位—操作员绑定；操作员必须属于同一公司。"""
-    db.execute(
-        delete(WorkstationOperator).where(WorkstationOperator.workstation_id == ws.id)
-    )
+    db.execute(delete(WorkstationOperator).where(WorkstationOperator.workstation_id == ws.id))
     if not operator_ids:
         return
     users = list(db.execute(select(User).where(User.id.in_(operator_ids))).scalars())
@@ -151,20 +151,69 @@ def record_heartbeat(db: Session, workstation_id: int) -> Workstation:
     return ws
 
 
-def bind_workstation(db: Session, user: User, workstation_id: int) -> Workstation:
+def unbind_workstation(db: Session, scope: Scope, workstation_id: int) -> Workstation:
+    current = get_workstation(db, workstation_id)
+    scope.assert_can_administer_company(current.company_id)
+    db.scalar(select(Company).where(Company.id == current.company_id).with_for_update())
+    ws = db.scalar(
+        select(Workstation)
+        .where(Workstation.id == workstation_id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
+    if ws.machine_id is None:
+        return ws
+    printing = db.scalar(
+        select(Code.id)
+        .where(Code.locked_workstation_id == ws.id, Code.status == "printing")
+        .limit(1)
+    )
+    claimed = db.scalar(
+        select(PrintTask.id)
+        .where(PrintTask.target_workstation_id == ws.id, PrintTask.status == "claimed")
+        .limit(1)
+    )
+    if printing is not None or claimed is not None:
+        raise ApiError(
+            ErrorCode.WORKSTATION_BUSY, "工位有正在执行的打印任务，请完成或回报失败后再解绑"
+        )
+    ws.machine_id = None
+    # Keep the prior timestamp as evidence that old clients must rebind.
+    ws.last_heartbeat_at = None
+    ws.printer_name = None
+    db.flush()
+    return ws
+
+
+def bind_workstation(db: Session, user: User, workstation_id: int, machine_id: str) -> Workstation:
     """工位软件首次配置时声明本机代表的工位（FR-069）。
 
     服务端职责：校验归属、校验停用、记录绑定时间。绑定关系本身持久化在工位端本机。
     """
-    ws = get_workstation(db, workstation_id)
+    company = db.scalar(select(Company).where(Company.id == user.company_id).with_for_update())
+    if company is None:
+        raise ApiError(ErrorCode.FORBIDDEN_SCOPE, "账号未关联企业，无法绑定工位")
+    ws = db.scalar(select(Workstation).where(Workstation.id == workstation_id).with_for_update())
+    if ws is None:
+        raise ApiError(ErrorCode.NOT_FOUND, "工位不存在")
 
     # 非总部用户只能绑定本公司工位
-    if user.role != "hq_admin" and ws.company_id != user.company_id:
+    if ws.company_id != user.company_id:
         raise ApiError(ErrorCode.FORBIDDEN_SCOPE, "无权绑定其他公司的工位")
 
     company = db.get(Company, ws.company_id)
     if ws.status != "active" or (company is not None and company.status != "active"):
         raise ApiError(ErrorCode.WORKSTATION_DISABLED, "工位或其所属公司已停用")
+
+    existing = db.scalar(select(Workstation).where(Workstation.machine_id == machine_id))
+    if (ws.machine_id is not None and ws.machine_id != machine_id) or (
+        existing is not None and existing.id != ws.id
+    ):
+        raise ApiError(
+            ErrorCode.WORKSTATION_BOUND,
+            "工位已被其他机器绑定，或本机已绑定其他工位，请刷新可用工位列表",
+        )
+    ws.machine_id = machine_id
 
     if ws.bound_at is None:
         ws.bound_at = utcnow()

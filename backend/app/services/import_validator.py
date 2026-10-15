@@ -21,7 +21,7 @@ from app.core.errors import ErrorCode
 from app.models.product import Product
 from app.services import code_value
 from app.services.import_errors import RowError
-from app.services.import_parser import iter_code_list, iter_mapping
+from app.services.import_parser import iter_code_list, iter_mapping, iter_product_batch
 
 # 与 FR-021 对应的错误类型
 ERR_DUPLICATE_IN_FILE = "DUPLICATE_IN_FILE"
@@ -44,6 +44,7 @@ class AcceptedRow:
     code_value: str
     product_id: int
     row_no: int
+    production_batch_no: str | None = None
 
 
 @dataclass
@@ -98,8 +99,8 @@ def validate(
     outcome = ValidationOutcome()
 
     # ---- 读取两个文件 ----
-    code_rows: dict[str, int] = {}          # 码值 -> 首次出现的行号
-    file_duplicates: dict[str, int] = {}    # 重复出现的码值 -> 行号
+    code_rows: dict[str, int] = {}  # 码值 -> 首次出现的行号
+    file_duplicates: dict[str, int] = {}  # 重复出现的码值 -> 行号
     for row_no, raw in iter_code_list(code_list_path):
         value, _ = code_value.check(raw)
         if not value:
@@ -135,7 +136,9 @@ def validate(
         )
         for value in missing_in_mapping[:MISMATCH_SAMPLE_LIMIT]:
             outcome.errors.append(
-                RowError(code_rows[value], value, None, ERR_MISSING_IN_MAPPING, "对照关系文件中缺少该码")
+                RowError(
+                    code_rows[value], value, None, ERR_MISSING_IN_MAPPING, "对照关系文件中缺少该码"
+                )
             )
         for value in missing_in_code_list[:MISMATCH_SAMPLE_LIMIT]:
             _, row_no = mapping[value]
@@ -149,7 +152,10 @@ def validate(
         for value, row_no in sorted(file_duplicates.items(), key=lambda kv: kv[1]):
             outcome.errors.append(
                 RowError(
-                    row_no, value, mapping[value][0], ERR_DUPLICATE_IN_FILE,
+                    row_no,
+                    value,
+                    mapping[value][0],
+                    ERR_DUPLICATE_IN_FILE,
                     _DUPLICATE_MESSAGES[ERR_DUPLICATE_IN_FILE],
                 )
             )
@@ -164,7 +170,10 @@ def validate(
         for value in sorted(duplicates_in_db):
             outcome.errors.append(
                 RowError(
-                    code_rows[value], value, mapping[value][0], ERR_DUPLICATE_IN_DB,
+                    code_rows[value],
+                    value,
+                    mapping[value][0],
+                    ERR_DUPLICATE_IN_DB,
                     _DUPLICATE_MESSAGES[ERR_DUPLICATE_IN_DB],
                 )
             )
@@ -183,8 +192,13 @@ def validate(
 
     for row_no, raw_value, err in mapping_value_errors:
         outcome.errors.append(
-            RowError(row_no, raw_value, None, err, code_value.ERROR_MESSAGES.get(err, "码值不合法")
-                     if err else "码值不合法")
+            RowError(
+                row_no,
+                raw_value,
+                None,
+                err,
+                code_value.ERROR_MESSAGES.get(err, "码值不合法") if err else "码值不合法",
+            )
         )
 
     for value in sorted(code_rows, key=lambda v: code_rows[v]):
@@ -199,4 +213,85 @@ def validate(
             continue
         outcome.accepted.append(AcceptedRow(value, product_id, row_no))
 
+    return outcome
+
+
+def validate_product_batch(
+    db: Session,
+    *,
+    code_list_path: Path,
+    product_id: int,
+    duplicate_policy: str | None = None,
+    on_progress: Callable[[int], None] | None = None,
+) -> ValidationOutcome:
+    outcome = ValidationOutcome()
+    product = db.get(Product, product_id)
+    if product is None or product.status != "active":
+        outcome.batch_error = ERR_PRODUCT_NOT_FOUND
+        outcome.batch_error_message = "请选择有效产品"
+        return outcome
+    policy = duplicate_policy or get_settings().import_duplicate_policy
+    seen: set[str] = set()
+    candidates: list[AcceptedRow] = []
+    duplicate_found = False
+    for row_no, raw_code, raw_batch, cell_error in iter_product_batch(code_list_path):
+        outcome.total_rows += 1
+        value, error = code_value.check(raw_code)
+        batch = code_value.normalize(raw_batch)
+        if cell_error or error:
+            outcome.errors.append(
+                RowError(
+                    row_no,
+                    value,
+                    product.code,
+                    "INVALID_CODE",
+                    cell_error or code_value.ERROR_MESSAGES[error],
+                )
+            )
+            continue
+        if value in seen:
+            duplicate_found = True
+            outcome.errors.append(
+                RowError(
+                    row_no,
+                    value,
+                    product.code,
+                    ERR_DUPLICATE_IN_FILE,
+                    _DUPLICATE_MESSAGES[ERR_DUPLICATE_IN_FILE],
+                )
+            )
+            continue
+        seen.add(value)
+        if not batch or len(batch) > 64 or any(ord(char) < 32 for char in batch):
+            outcome.errors.append(
+                RowError(
+                    row_no,
+                    value,
+                    product.code,
+                    "INVALID_PRODUCTION_BATCH",
+                    "产品批号必填、最多64个字符，不能包含换行或控制字符",
+                )
+            )
+            continue
+        candidates.append(AcceptedRow(value, product_id, row_no, batch))
+    if callable(on_progress):
+        on_progress(outcome.total_rows)
+    existing = _existing_codes(db, [row.code_value for row in candidates])
+    for row in candidates:
+        if row.code_value in existing:
+            outcome.errors.append(
+                RowError(
+                    row.row_no,
+                    row.code_value,
+                    product.code,
+                    ERR_DUPLICATE_IN_DB,
+                    _DUPLICATE_MESSAGES[ERR_DUPLICATE_IN_DB],
+                )
+            )
+        else:
+            outcome.accepted.append(row)
+    if policy != "skip_row" and (duplicate_found or existing):
+        outcome.batch_error = ErrorCode.IMPORT_DUPLICATE_CODE
+        outcome.batch_error_message = "文件内或系统中存在重复防伪码，整批拒绝"
+        outcome.accepted.clear()
     return outcome

@@ -66,7 +66,7 @@ describe('元素尺寸', () => {
 
   it('derives text height from font size', () => {
     expect(elementSizeMm({ type: 'text', x: 0, y: 0, content: 'x', font_size: 3 })).toEqual({
-      width: 0,
+      width: 20,
       height: 3,
     })
   })

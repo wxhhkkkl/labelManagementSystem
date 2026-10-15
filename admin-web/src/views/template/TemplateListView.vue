@@ -42,7 +42,16 @@
       </el-table-column>
     </el-table>
 
-    <el-dialog v-model="dialogVisible" :title="dialogTitle" width="960px" top="4vh">
+    <el-dialog
+      v-model="dialogVisible"
+      class="template-dialog"
+      :title="dialogTitle"
+      width="min(1400px, calc(100vw - 32px))"
+      top="4vh"
+      :close-on-click-modal="false"
+      :close-on-press-escape="!saving"
+      :show-close="!saving"
+    >
       <el-form v-if="!editingTemplate" inline class="create-form">
         <el-form-item label="模板编码">
           <el-input v-model="newCode" placeholder="如 TPL-A" style="width: 180px" />
@@ -58,19 +67,14 @@
         <span class="footer-hint">
           {{ problems.length ? `还有 ${problems.length} 处问题需要修正` : '版面校验通过' }}
         </span>
-        <el-button @click="dialogVisible = false">取消</el-button>
-        <el-button
-          type="primary"
-          :loading="saving"
-          :disabled="problems.length > 0"
-          @click="save"
-        >
+        <el-button :disabled="saving" @click="dialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="saving" :disabled="problems.length > 0" @click="save">
           保存
         </el-button>
       </template>
     </el-dialog>
 
-    <el-dialog v-model="previewVisible" title="打印预览" width="720px">
+    <el-dialog v-model="previewVisible" title="打印预览" width="min(900px, calc(100vw - 32px))">
       <TemplatePrintPreview v-if="previewDoc" :doc="previewDoc" :data="previewData" />
     </el-dialog>
   </div>
@@ -91,7 +95,7 @@ import {
 } from '../../api/template'
 import TemplateEditor from '../../components/TemplateEditor.vue'
 import TemplatePrintPreview from '../../components/TemplatePrintPreview.vue'
-import { validateDocument } from '../../utils/templateEditor'
+import { cloneTemplateDoc, validateDocument } from '../../utils/templateEditor'
 import type { TemplateDoc } from '../../utils/templateRender'
 
 const rows = ref<TemplateItem[]>([])
@@ -115,6 +119,9 @@ const previewData = {
   company_name: '华东分公司',
   code_value: 'A1B2C3D4',
   batch_no: 'ALL202610120001',
+    production_batch_no: '22PT510020DPHXQ1V',
+  print_date: '2026-10-14',
+  serial_no: '1',
 }
 
 const problems = computed(() => (editingDoc.value ? validateDocument(editingDoc.value) : []))
@@ -142,7 +149,7 @@ function openCreate(): void {
   editingTemplate.value = null
   newCode.value = ''
   newName.value = ''
-  editingDoc.value = structuredClone(EMPTY_DOC)
+  editingDoc.value = cloneTemplateDoc(EMPTY_DOC)
   dialogVisible.value = true
 }
 
@@ -154,7 +161,7 @@ async function openEdit(row: TemplateItem): Promise<void> {
       return
     }
     editingTemplate.value = row
-    editingDoc.value = structuredClone(versions[0].elements_json)
+    editingDoc.value = cloneTemplateDoc(versions[0].elements_json)
     dialogVisible.value = true
   } catch (e) {
     fail(e, '加载模板版本失败')
@@ -181,7 +188,7 @@ async function openPreview(row: TemplateItem): Promise<void> {
 }
 
 async function save(): Promise<void> {
-  if (!editingDoc.value) return
+  if (!editingDoc.value || saving.value || problems.value.length) return
   saving.value = true
   try {
     if (editingTemplate.value) {
@@ -234,6 +241,10 @@ onMounted(load)
 </script>
 
 <style scoped>
+:global(.template-dialog .el-dialog__body) {
+  max-height: calc(100vh - 190px);
+  overflow: auto;
+}
 .toolbar {
   display: flex;
   align-items: center;

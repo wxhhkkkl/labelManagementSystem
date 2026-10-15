@@ -7,29 +7,40 @@
     <el-card shadow="never" class="section">
       <template #header>
         <div class="card-header">
-          <span>导入码清单与"码—产品"对照关系</span>
+          <span>导入产品批号表</span>
           <el-button size="small" @click="onDownloadTemplate">下载导入模板</el-button>
         </div>
       </template>
 
       <p class="hint">
-        模板含两个工作表，请分别另存为两个文件后一并上传：<strong>码清单</strong>（列：码值）与
-        <strong>码—产品对照关系</strong>（列：码值、产品编码）。
-        两个文件的码集合必须完全一致，否则整批拒绝。码值限 100 位以内数字与字母。
+        上传一个 Excel 文件，首行为<strong>防伪码、产品批号、状态</strong>。
+        每个码的产品批号将用于标签打印，状态列不影响打印状态。
+        防伪码请保存为文本，以保留前导零和超过15位的数字。
       </p>
 
       <el-form label-width="120px">
+        <el-form-item label="所属产品">
+          <el-select
+            v-model="selectedProductId"
+            placeholder="选择这份码表所属的产品"
+            style="width: 360px"
+          >
+            <el-option
+              v-for="product in products.filter((p) => p.status === 'active')"
+              :key="product.id"
+              :label="`${product.name}（${product.code}）`"
+              :value="product.id"
+            />
+          </el-select>
+        </el-form-item>
         <el-form-item label="码清单文件">
           <input type="file" accept=".xlsx" @change="onPickCodeList" />
-        </el-form-item>
-        <el-form-item label="对照关系文件">
-          <input type="file" accept=".xlsx" @change="onPickMapping" />
         </el-form-item>
         <el-form-item>
           <el-button
             type="primary"
             :loading="uploading"
-            :disabled="!codeListFile || !mappingFile"
+            :disabled="!codeListFile || !selectedProductId"
             @click="submit"
           >
             上传并导入
@@ -51,11 +62,7 @@
       <el-progress :percentage="progressPercent(current)" :stroke-width="14" />
       <p class="progress-text">{{ progressText(current) }}</p>
 
-      <el-button
-        v-if="canDownloadErrors(current)"
-        size="small"
-        @click="onDownloadErrors"
-      >
+      <el-button v-if="canDownloadErrors(current)" size="small" @click="onDownloadErrors">
         下载失败明细
       </el-button>
     </el-card>
@@ -64,6 +71,9 @@
       <template #header><span>历史批次</span></template>
       <el-table v-loading="loading" :data="batches" border size="small">
         <el-table-column prop="batch_no" label="批次号" width="230" />
+        <el-table-column label="所属产品" min-width="180" show-overflow-tooltip>
+          <template #default="{ row }">{{ row.product_names?.join('、') || '—' }}</template>
+        </el-table-column>
         <el-table-column label="状态" width="100">
           <template #default="{ row }">
             <el-tag :type="statusTagType(row.status)" size="small">
@@ -98,6 +108,7 @@ import { ElMessage } from 'element-plus'
 import { onBeforeUnmount, onMounted, ref } from 'vue'
 
 import { ApiError } from '../../api/client'
+import { listProductOptions, type ProductOption } from '../../api/product'
 import {
   downloadErrors,
   downloadTemplate,
@@ -114,11 +125,11 @@ import {
   progressText,
   statusLabel,
   statusTagType,
-  validateUploadSelection,
 } from '../../utils/importView'
 
 const codeListFile = ref<File | null>(null)
-const mappingFile = ref<File | null>(null)
+const products = ref<ProductOption[]>([])
+const selectedProductId = ref<number | null>(null)
 const uploading = ref(false)
 const loading = ref(false)
 const error = ref<string | null>(null)
@@ -137,15 +148,15 @@ function onPickCodeList(event: Event): void {
   codeListFile.value = input.files?.[0] ?? null
 }
 
-function onPickMapping(event: Event): void {
-  const input = event.target as HTMLInputElement
-  mappingFile.value = input.files?.[0] ?? null
-}
-
 async function load(): Promise<void> {
   loading.value = true
   try {
     batches.value = await listBatches()
+    products.value = await listProductOptions()
+    const availableProducts = products.value.filter(product => product.status === 'active')
+    if (selectedProductId.value === null && availableProducts.length === 1) {
+      selectedProductId.value = availableProducts[0].id
+    }
   } catch (e) {
     fail(e, '加载批次失败')
   } finally {
@@ -181,7 +192,13 @@ function startPolling(batchId: number): void {
 }
 
 async function submit(): Promise<void> {
-  const invalid = validateUploadSelection(codeListFile.value, mappingFile.value)
+  const invalid = !selectedProductId.value
+    ? '请选择所属产品'
+    : !codeListFile.value
+      ? '请选择产品批号表'
+      : !codeListFile.value.name.toLowerCase().endsWith('.xlsx')
+        ? '仅支持 .xlsx 文件'
+        : null
   if (invalid) {
     ElMessage.warning(invalid)
     return
@@ -190,7 +207,7 @@ async function submit(): Promise<void> {
   error.value = null
   uploading.value = true
   try {
-    const created = await uploadImport(codeListFile.value!, mappingFile.value!)
+    const created = await uploadImport(codeListFile.value!, null, selectedProductId.value!)
     current.value = {
       id: created.batch_id,
       batch_no: created.batch_no,

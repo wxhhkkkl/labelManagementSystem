@@ -40,6 +40,8 @@ pixel = mm * CSS_PX_PER_MM
 | `barcode` | 一维条码 | `x`,`y`,`width`,`height` | `symbology`（默认 `code128`）、`show_text` |
 | `text` | 静态文本 | `x`,`y`,`content`,`font_size` | `font_family`、`bold`、`align` |
 | `field` | 动态字段 | `x`,`y`,`field_name`,`font_size` | `font_family`、`bold`、`align` |
+| `date` | 日期 | `x`,`y`,`font_size` | `date_source`（`print` / `fixed`）、`date_format`、固定日期 `content` |
+| `serial` | 每日流水号 | `x`,`y`,`font_size` | `prefix`、`suffix`、`serial_digits`（1～12，默认 6） |
 
 - 属性名 MUST 使用 `snake_case`，与 `elements_json` 保持一致。
 - `size` / `width` / `height` / `font_size` 单位均为毫米（字号亦为毫米高，**不是 pt**）。
@@ -55,6 +57,8 @@ pixel = mm * CSS_PX_PER_MM
 | `company_name` | 该码归属公司的名称 |
 | `code_value` | 码值本身 |
 | `batch_no` | **该码所在分配单的 `order_no`**（不是导入批次号） |
+| `print_date` | 该码首次打印任务使用的北京时间日期（`YYYY-MM-DD`），持久化保存 |
+| `serial_no` | 该日服务端统一分配的整数流水号，补打复用原编号 |
 
 - 打印接口响应中的 `data` 对象即为上表的取值结果，由服务端填充（见
   [workstation-api.md](./workstation-api.md)）。
@@ -64,7 +68,8 @@ pixel = mm * CSS_PX_PER_MM
 ## 5. 对齐与字体
 
 - `align` ∈ `left` / `center` / `right`，默认 `left`；对齐相对元素自身边界。
-- `text` 与 `field` 元素的高度由字号自动决定，MUST NOT 依赖自动换行；单行渲染。
+- 文本类元素可设置 `width` 与 `height`；未指定宽度时兼容旧模板，使用 20mm；未指定高度时沿用字号高度。新建文本框默认高 4.2mm、字号 3mm。
+- 默认单行；`text` 可启用 `multiline`，按照指定文本框尺寸换行并裁剪溢出内容。
 - 字体缺失时回退顺序：模板声明字体 → `微软雅黑`（Microsoft YaHei）→ `monospace`。
   工位端与预览端 MUST 使用同一回退顺序。
 
@@ -83,3 +88,14 @@ pixel = mm * CSS_PX_PER_MM
 
 **验收方式**：同一份 `elements_json` 在管理后台预览与工位端打印（输出到 PDF）后，
 逐元素比对位置与尺寸，偏差 MUST 在 ±0.5mm 内。该比对是 FR-038 打印预览功能的验收依据。
+
+## 7. 内容、图形与日期流水号补充（2026-10-14）
+
+- 二维码/条码的内容来源为 `field_name` 或静态 `content`；旧模板两项均为空时使用 `code_value`。二维码支持 L/M/Q/H 容错；条码支持 code128/code39/ean13。
+- 两端独立使用同版本本地图形编码库生成 SVG；打印 HTML 包含图形，不依赖远程图形服务或占位容器。
+- 管理预览缩放同时作用于元素位置、尺寸、字号和纸张。坐标与尺寸始终保存为毫米。超出纸张时由纸张边界裁剪，图形不得缩小。
+- 日期支持 YYYY-MM-DD、YYYY/MM/DD、YYYYMMDD、YYYY年MM月DD日；固定日期使用有效的 ISO 日期 `content`。
+- 每日流水号的计数范围为整个系统、所有工位；日期界线为 UTC+08:00 的午夜。后端事务中的原子计数与码行锁保证并发不重复。
+- 首次打印预占时分配日期与编号，保存到 `print_identity`。补打或不确定是否出纸的超时重试沿用快照，不重新编号。
+- 明确失败回退后释放码的快照，下次打印重新取当天编号；已消耗的编号不回收，因此可能有断号。不存在“无间隙编号”的承诺。
+- 渲染端不读取本机日期或自行递增流水号；缺少必要快照时实际打印报错，避免打印空白日期或编号。

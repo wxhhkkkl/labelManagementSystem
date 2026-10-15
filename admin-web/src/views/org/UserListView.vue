@@ -1,6 +1,6 @@
 <template>
   <div>
-    <h2>账号管理</h2>
+    <h2>{{ me?.role === 'hq_admin' ? '账号管理' : '员工管理' }}</h2>
     <el-alert v-if="error" :title="error" type="error" show-icon :closable="false" />
 
     <div class="toolbar">
@@ -8,7 +8,9 @@
         当前身份：{{ ROLE_LABELS[me.role] }}
         <template v-if="me.company"> · {{ me.company.name }}</template>
       </span>
-      <el-button type="primary" @click="dialogVisible = true">新建账号</el-button>
+      <el-button type="primary" :disabled="!me" @click="dialogVisible = true">{{
+        me?.role === 'hq_admin' ? '新建账号' : '新建员工'
+      }}</el-button>
     </div>
 
     <el-table v-loading="loading" :data="rows" border>
@@ -30,7 +32,11 @@
       <el-table-column label="操作" width="120">
         <template #default="{ row }">
           <el-button
-            v-if="row.status === 'active' && row.id !== me?.id"
+            v-if="
+              row.status === 'active' &&
+              row.id !== me?.id &&
+              (me?.role === 'hq_admin' || row.role === 'operator')
+            "
             size="small"
             type="danger"
             link
@@ -42,7 +48,11 @@
       </el-table-column>
     </el-table>
 
-    <el-dialog v-model="dialogVisible" title="新建账号" width="520px">
+    <el-dialog
+      v-model="dialogVisible"
+      :title="me?.role === 'hq_admin' ? '新建账号' : '新建员工'"
+      width="520px"
+    >
       <el-form label-width="90px">
         <el-form-item label="账号" :error="errors.username">
           <el-input v-model="form.username" />
@@ -55,13 +65,8 @@
         </el-form-item>
         <el-form-item label="角色" :error="errors.role">
           <!-- 选项按当前身份裁剪，避免选到必然被拒的角色（FR-004） -->
-          <el-select v-model="form.role">
-            <el-option
-              v-for="r in roleOptions"
-              :key="r"
-              :label="ROLE_LABELS[r]"
-              :value="r"
-            />
+          <el-select v-model="form.role" :disabled="me?.role === 'sub_admin'">
+            <el-option v-for="r in roleOptions" :key="r" :label="ROLE_LABELS[r]" :value="r" />
           </el-select>
         </el-form-item>
         <el-form-item v-if="form.role !== 'hq_admin'" label="所属公司" :error="errors.company_id">
@@ -72,7 +77,7 @@
       </el-form>
       <template #footer>
         <el-button @click="dialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="submit">保存</el-button>
+        <el-button type="primary" :loading="saving" @click="submit">保存</el-button>
       </template>
     </el-dialog>
   </div>
@@ -109,6 +114,7 @@ const loading = ref(false)
 const error = ref<string | null>(null)
 
 const dialogVisible = ref(false)
+const saving = ref(false)
 const errors = ref<Errors>({})
 const form = ref<UserForm>({
   username: '',
@@ -140,9 +146,10 @@ async function load(): Promise<void> {
 }
 
 async function submit(): Promise<void> {
-  if (!me.value) return
+  if (!me.value || saving.value) return
   errors.value = validateUser(form.value, me.value.role, me.value.company_id)
   if (!isValid(errors.value)) return
+  saving.value = true
   try {
     await createUser({ ...form.value })
     dialogVisible.value = false
@@ -156,6 +163,8 @@ async function submit(): Promise<void> {
     await load()
   } catch (e) {
     fail(e, '创建账号失败')
+  } finally {
+    saving.value = false
   }
 }
 
@@ -177,7 +186,14 @@ onMounted(async () => {
     fail(e, '获取当前用户失败')
   }
   try {
-    companies.value = await listCompanies()
+    if (me.value?.role === 'sub_admin') {
+      const company = me.value.company
+      companies.value = company
+        ? [{ ...company, code: '', contact: null, region: null, status: 'active' }]
+        : []
+    } else {
+      companies.value = await listCompanies()
+    }
   } catch {
     // 子公司管理员无公司列表权限时可忽略，其公司由 me 决定
   }

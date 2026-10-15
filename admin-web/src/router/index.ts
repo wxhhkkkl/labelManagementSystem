@@ -1,8 +1,16 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { fetchMe } from '../api/auth'
+import { ApiError, getToken, setToken } from '../api/client'
+import { canAccessAdminPage } from '../utils/adminPermissions'
 
 export const router = createRouter({
   history: createWebHistory(),
   routes: [
+    {
+      path: '/login',
+      name: 'login',
+      component: () => import('../views/auth/LoginView.vue'),
+    },
     { path: '/', redirect: '/org' },
     {
       path: '/org',
@@ -75,4 +83,29 @@ export const router = createRouter({
       component: () => import('../views/audit/AuditLogView.vue'),
     },
   ],
+})
+
+router.beforeEach(async (to) => {
+  if (to.name === 'login') return true
+  const loginRoute = { name: 'login', query: { redirect: to.fullPath } }
+  if (!getToken()) return loginRoute
+  try {
+    const user = await fetchMe()
+    if (!canAccessAdminPage(user.role, to.path)) {
+      return user.role === 'sub_admin' ? '/workstations' : '/login'
+    }
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 401) {
+      setToken(null)
+      return loginRoute
+    }
+    // 网络或服务错误由业务页面展示，保留现有登录状态。
+  }
+  return true
+})
+
+window.addEventListener('lms:unauthorized', () => {
+  if (router.currentRoute.value.name !== 'login') {
+    void router.replace({ name: 'login', query: { redirect: router.currentRoute.value.fullPath } })
+  }
 })

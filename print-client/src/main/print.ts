@@ -33,6 +33,14 @@ export async function listSystemPrinters(): Promise<string[]> {
   }
 }
 
+export async function getDefaultSystemPrinter(): Promise<string | null> {
+  const probe = new BrowserWindow({ show: false, webPreferences: { sandbox: true } })
+  try {
+    const printers = await probe.webContents.getPrintersAsync()
+    return printers.find(printer => printer.isDefault)?.name ?? null
+  } finally { probe.destroy() }
+}
+
 export function printHtml(job: ElectronPrintJob): Promise<{ ok: boolean; error?: string }> {
   return new Promise((resolve) => {
     const win = new BrowserWindow({

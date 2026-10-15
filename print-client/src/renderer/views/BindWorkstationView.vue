@@ -1,8 +1,8 @@
 <template>
   <div class="bind">
-    <h1>工位软件 · 首次配置</h1>
+    <h1>{{ me ? '绑定本机工位' : '操作员登录' }}</h1>
     <p class="hint">
-      本机将代表所选工位。绑定后，本机产生的全部打印记录都会记到该工位上，无需每次选择。
+      每次打开软件请操作员登录。已绑定的电脑登录后自动进入原工位，首次使用需选择本企业的可用工位。
     </p>
 
     <el-alert v-if="error" :title="error" type="error" show-icon :closable="false" />
@@ -17,26 +17,27 @@
     />
 
     <template v-if="!bound">
-      <el-form label-width="90px" class="form">
+      <el-form v-if="!me" label-width="90px" class="form" @submit.prevent="doLogin">
         <el-form-item label="账号">
-          <el-input v-model="username" />
+          <el-input v-model="username" placeholder="请输入工位操作员账号" autocomplete="username" />
         </el-form-item>
         <el-form-item label="密码">
-          <el-input v-model="password" type="password" show-password />
+          <el-input v-model="password" type="password" show-password placeholder="请输入密码" autocomplete="current-password" @keyup.enter="doLogin" />
         </el-form-item>
         <el-form-item>
-          <el-button :loading="loggingIn" @click="doLogin">登录</el-button>
+          <el-button type="primary" :loading="loggingIn" :disabled="!username.trim() || !password" @click="doLogin">登录</el-button>
         </el-form-item>
       </el-form>
 
       <el-form v-if="me" label-width="90px" class="form">
+        <el-form-item label="所属企业">{{ me.company?.name ?? '未关联企业' }}</el-form-item>
         <el-form-item label="选择工位">
           <el-select v-model="selectedId" placeholder="请选择本机代表的工位">
             <el-option
-              v-for="ws in me.workstations"
-              :key="ws.id"
+              v-for="ws in availableWorkstations"
+              :key="ws.workstation_id"
               :label="ws.name"
-              :value="ws.id"
+              :value="ws.workstation_id"
             />
           </el-select>
         </el-form-item>
@@ -48,8 +49,8 @@
       </el-form>
 
       <el-empty
-        v-if="me && me.workstations.length === 0"
-        description="当前账号尚未被绑定到任何工位，请联系管理员在管理后台配置"
+        v-if="me && availableWorkstations.length === 0"
+        description="所属企业暂无未绑定的可用工位，请在管理后台新增工位或检查现有机器绑定"
       />
     </template>
   </div>
@@ -58,20 +59,23 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 
-import { ApiError, getBoundWorkstationId, setToken } from '../api/client'
+import { ApiError, setBoundWorkstationId, setBoundPrinter, setToken } from '../api/client'
 
-const emit = defineEmits<{ bound: [workstationId: number] }>()
+const emit = defineEmits<{ bound: [workstationId: number, user: MeUser, station: BindResponse] }>()
 import {
   bindWorkstation,
-  fetchMe,
   login,
+  listAvailableWorkstations,
+  getMachineBinding,
   type BindResponse,
   type MeUser,
 } from '../api/workstation'
+const props = defineProps<{ sessionUser?: MeUser | null }>()
 
 const username = ref('')
 const password = ref('')
 const me = ref<MeUser | null>(null)
+const availableWorkstations = ref<BindResponse[]>([])
 const selectedId = ref<number | null>(null)
 const bound = ref<BindResponse | null>(null)
 const error = ref<string | null>(null)
@@ -88,7 +92,11 @@ async function doLogin(): Promise<void> {
     const result = await login(username.value, password.value)
     setToken(result.access_token)
     me.value = result.user
+    password.value = ''
+    await loadBinding()
   } catch (e) {
+    me.value = null
+    setToken(null)
     fail(e, '登录失败')
   } finally {
     loggingIn.value = false
@@ -100,31 +108,35 @@ async function doBind(): Promise<void> {
   error.value = null
   try {
     bound.value = await bindWorkstation(selectedId.value)
-    emit('bound', bound.value.workstation_id)
+    if (me.value) emit('bound', bound.value.workstation_id, me.value, bound.value)
   } catch (e) {
     fail(e, '绑定工位失败')
+    availableWorkstations.value = await listAvailableWorkstations().catch(() => [])
+    selectedId.value = null
   }
 }
 
+async function loadBinding(): Promise<void> {
+  const current = await getMachineBinding()
+  if (current) {
+    setBoundWorkstationId(current.workstation_id)
+    setBoundPrinter(current.printer_name)
+    if (me.value) emit('bound', current.workstation_id, me.value, current)
+    return
+  }
+  setBoundWorkstationId(null)
+  availableWorkstations.value = await listAvailableWorkstations()
+  selectedId.value = availableWorkstations.value.length === 1 ? availableWorkstations.value[0].workstation_id : null
+}
+
 onMounted(async () => {
-  // 已绑定过的机器直接展示结果，无需重复配置（FR-069）
-  const existing = getBoundWorkstationId()
-  if (existing === null) return
+  if (!props.sessionUser) return
   try {
-    const profile = await fetchMe()
-    me.value = profile
-    const match = profile.workstations.find((w) => w.id === existing)
-    if (match) {
-      bound.value = {
-        workstation_id: match.id,
-        name: match.name,
-        company_id: profile.company_id ?? 0,
-        printer_name: null,
-      }
-      emit('bound', match.id)
-    }
-  } catch {
-    // 未登录时不打扰用户，走正常的首次配置流程
+    me.value = props.sessionUser
+    await loadBinding()
+  } catch (e) {
+    me.value = null
+    fail(e, '识别本机工位失败，请重新登录')
   }
 })
 </script>

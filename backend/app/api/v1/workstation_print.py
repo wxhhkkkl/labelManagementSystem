@@ -12,8 +12,12 @@ from sqlalchemy.orm import Session
 from app.core.db import get_db
 from app.core.deps import ClientIp, CurrentUser
 from app.core.errors import ApiError, ErrorCode
+from app.core.machine import check_bound_machine
 from app.models.user import User
 from app.models.workstation import Workstation
+from app.models.allocation_order import AllocationOrder
+from app.models.template import Template, TemplateVersion
+from app.services.template_resolver import dynamic_fields_for
 from app.schemas.printing import (
     AcceptedPrintOut,
     ConfirmRequest,
@@ -26,7 +30,9 @@ from app.schemas.printing import (
 )
 from app.services import audit, printing
 
-router = APIRouter(prefix="/workstation", tags=["workstation"])
+router = APIRouter(
+    prefix="/workstation", tags=["workstation"], dependencies=[Depends(check_bound_machine)]
+)
 
 DbSession = Annotated[Session, Depends(get_db)]
 
@@ -65,15 +71,32 @@ def list_codes(
     )
 
 
+@router.get("/template")
+def current_template(user: CurrentUser, db: DbSession, workstation_id: int, product_id: int):
+    """预览下一张待打印码的分配版本；不预占码、不生成日期或流水号。"""
+    station = _workstation_for(db, user, workstation_id)
+    rows, _ = printing.list_printable_codes(
+        db, company_id=station.company_id, product_id=product_id, page=1, page_size=1
+    )
+    if not rows:
+        return None
+    code = rows[0]
+    order = db.get(AllocationOrder, code.current_allocation_order_id)
+    version = db.get(TemplateVersion, order.template_version_id) if order else None
+    if version is None:
+        raise ApiError(ErrorCode.VALIDATION_ERROR, "待打印码的模板版本不存在")
+    template = db.get(Template, version.template_id)
+    return {
+        "name": template.name, "version_no": version.version_no,
+        "elements_json": version.elements_json, "data": dynamic_fields_for(db, code),
+    }
+
+
 @router.get("/codes/{code_value}")
-def get_code(
-    code_value: str, user: CurrentUser, db: DbSession, workstation_id: int
-) -> dict:
+def get_code(code_value: str, user: CurrentUser, db: DbSession, workstation_id: int) -> dict:
     """扫码定位单个码（FR-040）。不可打印时返回对应错误码。"""
     workstation = _workstation_for(db, user, workstation_id)
-    code = printing.get_code_for_print(
-        db, code_value=code_value, company_id=workstation.company_id
-    )
+    code = printing.get_code_for_print(db, code_value=code_value, company_id=workstation.company_id)
     return {"code_value": code.code_value, "product_id": code.product_id, "status": code.status}
 
 

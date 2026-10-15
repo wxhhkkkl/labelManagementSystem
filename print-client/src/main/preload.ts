@@ -8,6 +8,7 @@
 import { contextBridge } from 'electron'
 
 contextBridge.exposeInMainWorld('lmsBridge', {
+  machineId: process.argv.find(arg => arg.startsWith('--lms-machine-id='))?.slice('--lms-machine-id='.length) ?? String(process.env.LMS_MACHINE_ID ?? ''),
   printServicePort: Number(process.env.LMS_PRINT_PORT ?? 0),
   printServiceToken: String(process.env.LMS_PRINT_TOKEN ?? ''),
 })

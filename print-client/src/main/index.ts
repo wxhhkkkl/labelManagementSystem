@@ -9,31 +9,43 @@
  * 启动顺序有讲究：打印服务必须先于窗口就绪，否则界面一打开就显示"打印服务未启动"。
  */
 
-import { app, BrowserWindow } from 'electron'
+import { app, BrowserWindow, shell } from 'electron'
+import { isPrinterSupportUrl } from '../printerSupport'
 import { join } from 'node:path'
+import { loadMachineIdentity } from './machineIdentity'
 
-import { listSystemPrinters, printHtml } from './print'
+import { listSystemPrinters, getDefaultSystemPrinter, printHtml } from './print'
 import { PrintService } from '../print-service/server'
 
 const isDev = !!process.env.ELECTRON_RENDERER_URL
 
 const printService = new PrintService({
   listPrinters: listSystemPrinters,
+  defaultPrinter: getDefaultSystemPrinter,
   print: (job) => printHtml(job),
-})
+}, process.env.ELECTRON_RENDERER_URL ? new URL(process.env.ELECTRON_RENDERER_URL).origin : 'null')
 
 let mainWindow: BrowserWindow | null = null
 
 function createWindow(): BrowserWindow {
   const win = new BrowserWindow({
-    width: 1024,
-    height: 720,
+    width: 1200,
+    height: 860,
+    minWidth: 800,
+    minHeight: 640,
     title: '打印管理系统 · 工位软件',
+    icon: isDev ? join(__dirname, '../../resources/app.ico') : join(process.resourcesPath, 'app.ico'),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,
       nodeIntegration: false,
+      additionalArguments: [`--lms-machine-id=${process.env.LMS_MACHINE_ID}`],
     },
+  })
+
+  win.webContents.setWindowOpenHandler(({url}) => {
+    if (isPrinterSupportUrl(url)) void shell.openExternal(url).catch(error => console.error('打开驱动下载页失败', error))
+    return { action: 'deny' }
   })
 
   if (isDev) {
@@ -46,6 +58,9 @@ function createWindow(): BrowserWindow {
 }
 
 void app.whenReady().then(async () => {
+  if (process.platform === 'win32') app.setAppUserModelId('com.labelmgmt.print-client')
+  const machineId = loadMachineIdentity(app.getPath('appData'), app.getPath('userData'))
+  process.env.LMS_MACHINE_ID = machineId
   const port = await printService.start()
   // 供 preload 读取并转交给渲染层
   process.env.LMS_PRINT_PORT = String(port)

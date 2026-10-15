@@ -10,7 +10,7 @@ from io import BytesIO
 from pathlib import Path
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, File, Response, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, Response, UploadFile, status
 from fastapi.responses import FileResponse
 from openpyxl import Workbook
 from sqlalchemy import select
@@ -19,7 +19,9 @@ from sqlalchemy.orm import Session
 from app.core.db import get_db
 from app.core.deps import ClientIp, HqAdmin
 from app.core.errors import ApiError, ErrorCode
+from app.models.code import Code
 from app.models.import_batch import ImportBatch
+from app.models.product import Product
 from app.schemas.import_batch import ImportBatchOut, ImportCreatedOut
 from app.services import audit
 from app.tasks import import_worker
@@ -48,19 +50,18 @@ def _get_batch(db: Session, batch_id: int) -> ImportBatch:
 # 注意：/template 必须声明在 /{batch_id} 之前，否则会被当作 batch_id 解析
 @router.get("/template")
 def download_template(user: HqAdmin) -> Response:
-    """FR-012：标准 Excel 导入模板。
-
-    一个工作簿两个 sheet——码清单与对照关系需分别另存为两个文件后上传。
-    """
+    """Download the single-file anti-counterfeit-code / production-batch template."""
     workbook = Workbook()
     sheet = workbook.active
-    sheet.title = "码清单"
-    sheet.append(["码值"])
-    sheet.append(["A001B002C003"])
-
-    mapping = workbook.create_sheet("码-产品对照关系")
-    mapping.append(["码值", "产品编码"])
-    mapping.append(["A001B002C003", "P001"])
+    sheet.title = "产品批号表"
+    sheet.append(["防伪码", "产品批号", "状态"])
+    sheet.append(["0612286397031613", "22PT510020DL99S78", "未查"])
+    for cell in sheet[2][:2]:
+        cell.number_format = "@"
+    sheet.column_dimensions["A"].width = 24
+    sheet.column_dimensions["B"].width = 26
+    sheet.column_dimensions["C"].width = 12
+    sheet.freeze_panes = "A2"
 
     bio = BytesIO()
     workbook.save(bio)
@@ -77,24 +78,33 @@ def create_import(
     db: DbSession,
     ip: ClientIp,
     code_list_file: Annotated[UploadFile, File()],
-    mapping_file: Annotated[UploadFile, File()],
+    mapping_file: Annotated[UploadFile | None, File()] = None,
+    product_id: Annotated[int | None, Form()] = None,
 ) -> ImportCreatedOut:
-    """上传两个文件并登记批次。**不做任何解析**——那是 worker 的事。"""
+    """Register one workbook with a selected product, or a legacy file pair."""
+    if mapping_file is None:
+        product = db.get(Product, product_id) if product_id is not None else None
+        if product is None or product.status != "active":
+            raise ApiError(ErrorCode.VALIDATION_ERROR, "请选择有效的所属产品")
+    elif product_id is not None:
+        raise ApiError(ErrorCode.VALIDATION_ERROR, "请使用单文件加产品，或旧版双文件方式，不能混用")
     batch_no = _new_batch_no()
     target = import_worker.batch_dir(batch_no)
     target.mkdir(parents=True, exist_ok=True)
 
     saved = {
         import_worker.code_list_path(batch_no): code_list_file,
-        import_worker.mapping_path(batch_no): mapping_file,
     }
+    if mapping_file is not None:
+        saved[import_worker.mapping_path(batch_no)] = mapping_file
     for path, upload in saved.items():
         _save_upload(upload, path)
 
     batch = ImportBatch(
         batch_no=batch_no,
         code_list_filename=code_list_file.filename or "code_list.xlsx",
-        mapping_filename=mapping_file.filename or "mapping.xlsx",
+        mapping_filename=(mapping_file.filename or "mapping.xlsx") if mapping_file else "",
+        product_id=product_id,
         status="pending",
         processed_rows=0,
         success_count=0,
@@ -137,12 +147,43 @@ def _save_upload(upload: UploadFile, path) -> None:
 @router.get("", response_model=list[ImportBatchOut])
 def list_imports(user: HqAdmin, db: DbSession, limit: int = 50):
     stmt = select(ImportBatch).order_by(ImportBatch.id.desc()).limit(min(limit, 200))
-    return list(db.execute(stmt).scalars())
+    return _batch_outputs(db, list(db.execute(stmt).scalars()))
+
+
+def _batch_outputs(db: Session, batches: list[ImportBatch]) -> list[ImportBatchOut]:
+    product_ids = {batch.product_id for batch in batches if batch.product_id is not None}
+    names = (
+        dict(db.execute(select(Product.id, Product.name).where(Product.id.in_(product_ids))).all())
+        if product_ids
+        else {}
+    )
+    legacy_ids = [batch.id for batch in batches if batch.product_id is None]
+    legacy_names: dict[int, list[str]] = {}
+    if legacy_ids:
+        rows = db.execute(
+            select(Code.import_batch_id, Product.id, Product.name)
+            .join(Product, Product.id == Code.product_id)
+            .where(Code.import_batch_id.in_(legacy_ids))
+            .distinct()
+            .order_by(Product.id)
+        ).all()
+        for batch_id, _, name in rows:
+            legacy_names.setdefault(batch_id, []).append(name)
+    output = []
+    for batch in batches:
+        item = ImportBatchOut.model_validate(batch)
+        item.product_names = (
+            [names[batch.product_id]]
+            if batch.product_id in names
+            else legacy_names.get(batch.id, [])
+        )
+        output.append(item)
+    return output
 
 
 @router.get("/{batch_id}", response_model=ImportBatchOut)
-def get_import(batch_id: int, user: HqAdmin, db: DbSession) -> ImportBatch:
-    return _get_batch(db, batch_id)
+def get_import(batch_id: int, user: HqAdmin, db: DbSession) -> ImportBatchOut:
+    return _batch_outputs(db, [_get_batch(db, batch_id)])[0]
 
 
 @router.get("/{batch_id}/errors")

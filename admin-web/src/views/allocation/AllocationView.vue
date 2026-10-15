@@ -31,13 +31,6 @@
           </span>
         </el-form-item>
 
-        <el-form-item label="码段范围" :error="rangeError ?? undefined">
-          <el-input v-model="form.code_range_from" placeholder="起（可空）" style="width: 180px" />
-          <span class="dash">~</span>
-          <el-input v-model="form.code_range_to" placeholder="止（可空）" style="width: 180px" />
-          <span class="hint">留空则按导入批次先进先出取码</span>
-        </el-form-item>
-
         <el-form-item>
           <el-button type="primary" :loading="submitting" @click="submit">确认分配</el-button>
         </el-form-item>
@@ -51,13 +44,8 @@
         <el-table-column prop="company_name" label="公司" width="150" />
         <el-table-column prop="product_name" label="产品" />
         <el-table-column prop="code_count" label="数量" width="90" />
-        <el-table-column label="码段" width="200">
-          <template #default="{ row }">
-            {{ row.code_range_from }} ~ {{ row.code_range_to }}
-          </template>
-        </el-table-column>
-        <el-table-column label="模板版本" width="100">
-          <template #default="{ row }">#{{ row.template_version_id }}</template>
+        <el-table-column label="模板名称" min-width="200" show-overflow-tooltip>
+          <template #default="{ row }">{{ row.template_name || '—' }}</template>
         </el-table-column>
         <el-table-column label="状态" width="90">
           <template #default="{ row }">
@@ -97,18 +85,17 @@ import {
   type AllocationOrder,
 } from '../../api/allocation'
 import { listCompanies, type Company } from '../../api/org'
-import { listProducts, type Product } from '../../api/product'
+import { listProductOptions, type ProductOption } from '../../api/product'
 import {
   confirmText,
   isValid,
   validateAllocation,
-  validateCodeRange,
   type AllocationForm,
   type Errors,
 } from '../../utils/allocation'
 
 const companies = ref<Company[]>([])
-const products = ref<Product[]>([])
+const products = ref<ProductOption[]>([])
 const orders = ref<AllocationOrder[]>([])
 const available = ref<number | null>(null)
 
@@ -116,14 +103,11 @@ const loading = ref(false)
 const submitting = ref(false)
 const error = ref<string | null>(null)
 const errors = ref<Errors>({})
-const rangeError = ref<string | null>(null)
 
 const form = ref<AllocationForm>({
   company_id: null,
   product_id: null,
   quantity: 100,
-  code_range_from: '',
-  code_range_to: '',
 })
 
 const activeProducts = computed(() => products.value.filter((p) => p.status === 'active'))
@@ -154,7 +138,6 @@ async function refreshAvailable(): Promise<void> {
     const page = await listCodes({
       product_id: form.value.product_id,
       status: 'unallocated',
-      batch_id: form.value.batch_id ?? undefined,
       page_size: 1,
     })
     available.value = page.total
@@ -165,8 +148,6 @@ async function refreshAvailable(): Promise<void> {
 
 async function submit(): Promise<void> {
   errors.value = validateAllocation(form.value, available.value)
-  rangeError.value = validateCodeRange(form.value.code_range_from, form.value.code_range_to)
-  if (rangeError.value) errors.value.code_range = rangeError.value
   if (!isValid(errors.value)) return
 
   const company = companies.value.find((c) => c.id === form.value.company_id)
@@ -187,9 +168,6 @@ async function submit(): Promise<void> {
       company_id: form.value.company_id,
       product_id: form.value.product_id,
       quantity: form.value.quantity,
-      batch_id: form.value.batch_id ?? null,
-      code_range_from: form.value.code_range_from || null,
-      code_range_to: form.value.code_range_to || null,
     })
     ElMessage.success(`已分配 ${created.allocated} 个码，单号 ${created.order.order_no}`)
     await load()
@@ -223,7 +201,11 @@ async function reclaim(order: AllocationOrder): Promise<void> {
 onMounted(async () => {
   try {
     companies.value = await listCompanies()
-    products.value = await listProducts()
+    products.value = await listProductOptions()
+    if (form.value.product_id === null && activeProducts.value.length === 1) {
+      form.value.product_id = activeProducts.value[0].id
+      await refreshAvailable()
+    }
   } catch (e) {
     fail(e, '加载公司或产品失败')
   }
@@ -239,13 +221,5 @@ onMounted(async () => {
   margin-left: 12px;
   color: var(--el-text-color-secondary);
   font-size: 13px;
-}
-.dash {
-  margin: 0 8px;
-}
-.hint {
-  margin-left: 12px;
-  color: var(--el-text-color-secondary);
-  font-size: 12px;
 }
 </style>

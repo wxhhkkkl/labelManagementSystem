@@ -16,9 +16,7 @@ WorkstationStatus = Enum("active", "disabled", name="workstation_status")
 
 class Workstation(PkMixin, TimestampMixin, Base):
     __tablename__ = "workstation"
-    __table_args__ = (
-        UniqueConstraint("company_id", "code", name="uq_workstation_company_code"),
-    )
+    __table_args__ = (UniqueConstraint("company_id", "code", name="uq_workstation_company_code"),)
 
     code: Mapped[str] = mapped_column(String(32), nullable=False)
     name: Mapped[str] = mapped_column(String(128), nullable=False)
@@ -26,6 +24,7 @@ class Workstation(PkMixin, TimestampMixin, Base):
     printer_name: Mapped[str | None] = mapped_column(String(255))
     status: Mapped[str] = mapped_column(WorkstationStatus, nullable=False, default="active")
     bound_at: Mapped[datetime | None] = mapped_column(DateTime)
+    machine_id: Mapped[str | None] = mapped_column(String(36), unique=True)
     last_heartbeat_at: Mapped[datetime | None] = mapped_column(DateTime, index=True)
 
     company: Mapped["Company"] = relationship(back_populates="workstations")  # noqa: F821

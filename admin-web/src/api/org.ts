@@ -22,6 +22,7 @@ export interface Workstation {
   status: 'active' | 'disabled'
   last_heartbeat_at: string | null
   online: boolean
+  machine_bound?: boolean
   operator_ids: number[]
 }
 
@@ -65,6 +66,9 @@ export const updateWorkstation = (id: number, json: Record<string, unknown>) =>
 
 export const disableWorkstation = (id: number) =>
   request<Workstation>(`/api/v1/workstations/${id}/disable`, { method: 'POST' })
+
+export const unbindWorkstation = (id: number) =>
+  request<Workstation>(`/api/v1/workstations/${id}/unbind`, { method: 'POST' })
 
 export const listUsers = (companyId?: number) =>
   request<User[]>(`/api/v1/users${companyId ? `?company_id=${companyId}` : ''}`)

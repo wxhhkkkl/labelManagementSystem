@@ -63,6 +63,7 @@ class WorkstationOut(_Base):
     status: str
     last_heartbeat_at: datetime | None = None
     online: bool = False
+    machine_bound: bool = False
     operator_ids: list[int] = Field(default_factory=list)
 
 

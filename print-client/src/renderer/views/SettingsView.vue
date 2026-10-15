@@ -1,113 +1,72 @@
 <template>
   <section class="settings">
-    <h3>工位设置</h3>
-
-    <el-alert
-      :title="status.message"
-      :type="status.state === 'ok' ? 'success' : 'warning'"
-      show-icon
-      :closable="false"
-    />
-
-    <el-form label-width="110px" class="form">
-      <el-form-item label="本机打印机">
-        <el-select v-model="selected" placeholder="选择本机打印机" style="width: 320px">
-          <el-option
-            v-for="printer in printers"
-            :key="printer.name"
-            :label="printerLabel(printer)"
-            :value="printer.name"
-          />
-        </el-select>
-        <el-button type="primary" :disabled="!selected" :loading="saving" @click="save">
-          保存
-        </el-button>
-      </el-form-item>
-
-      <el-form-item label="打印机清单">
-        <el-button size="small" @click="refresh">重新读取</el-button>
-        <span class="hint">
-          清单来自本机操作系统，不是服务端——换个型号只要装好驱动就能选到。
-        </span>
-      </el-form-item>
-    </el-form>
-
-    <el-alert
-      v-if="needsRebind"
-      type="warning"
-      show-icon
-      :closable="false"
-      title="原先绑定的打印机已不在本机清单中"
-      description="可能是换了电脑或重装了驱动。请重新选择一台打印机并保存。"
-    />
-
-    <p class="hint">
-      已保存：{{ boundPrinter ?? '未绑定' }}
-      <template v-if="recoveries > 0"> · 打印服务已自动重连 {{ recoveries }} 次</template>
-    </p>
+    <h3>工位状态</h3>
+    <el-alert :title="serviceOk ? '打印服务正常' : '打印服务未启动'" :type="serviceOk ? 'success' : 'warning'" show-icon :closable="false" />
+    <el-descriptions :column="1" border class="service-details">
+      <el-descriptions-item label="当前工位">{{ stationName || '—' }}</el-descriptions-item>
+      <el-descriptions-item label="当前打印机">{{ saved || '尚未选择' }}</el-descriptions-item>
+    </el-descriptions>
+    <label class="field-label">选择打印机</label>
+    <div class="printer-choice">
+      <el-select v-model="selection" placeholder="选择本机打印机" aria-label="选择打印机" :disabled="!serviceOk || saving || testing" @change="save">
+        <el-option v-for="name in printers" :key="name" :label="name" :value="name" />
+      </el-select>
+      <el-button :loading="loading" @click="refresh">刷新状态</el-button>
+    </div>
+    <p class="hint">选择后自动保存，下次打开继续使用。</p>
+    <el-alert v-if="saved && serviceOk && !printers.includes(saved)" title="已保存的打印机当前不可用，请重新选择或检查连接。" type="warning" :closable="false" />
+    <el-button type="primary" :loading="testing" :disabled="!serviceOk || !saved || !printers.includes(saved) || saving" @click="testPrint">测试打印一张</el-button>
+    <p class="hint">使用 40 × 55 mm 测试标签，仅打印独立测试二维码，不占用业务码。</p>
   </section>
 </template>
-
 <script setup lang="ts">
-import { ElMessage } from 'element-plus'
 import { onMounted, ref } from 'vue'
-
-import { ApiError, getBoundPrinter, setBoundPrinter } from '../api/client'
-import { setWorkstationPrinter } from '../api/workstation'
-import { printerLabel, normalizePrinters, type PrinterInfo } from '../../print-service/printers'
-import { usePrintServiceStatus } from '../composables/usePrintServiceStatus'
-
-const props = defineProps<{ workstationId: number }>()
-
-const { status, needsRebind, recoveries, start } = usePrintServiceStatus()
-const printers = ref<PrinterInfo[]>([])
-const boundPrinter = ref<string | null>(getBoundPrinter())
-const selected = ref<string | null>(boundPrinter.value)
-const saving = ref(false)
-
-async function refresh(): Promise<void> {
-  // 清单要走打印服务拿（它才有 OS 枚举能力），拿不到就报服务未启动
-  const { listPrinters } = await import('../api/print-service')
+import { ElMessage } from 'element-plus'
+import { isPrintServiceAlive, getDefaultPrinter, listPrinters, print } from '../api/print-service'
+import { getMachineBinding, setWorkstationPrinter } from '../api/workstation'
+import { getBoundPrinter, setBoundPrinter } from '../api/client'
+import { testLabel } from '../utils/testLabel'
+const props = defineProps<{workstationId:number}>()
+const serviceOk=ref(false), stationName=ref(''), loading=ref(false), saving=ref(false), testing=ref(false)
+const printers=ref<string[]>([]), saved=ref(getBoundPrinter() ?? ''), selection=ref(saved.value)
+async function save():Promise<void> {
+  saving.value=true
   try {
-    const names = await listPrinters()
-    printers.value = normalizePrinters(names.map((name) => ({ name })))
-  } catch {
-    printers.value = []
-  }
+    await setWorkstationPrinter(props.workstationId,selection.value)
+    setBoundPrinter(selection.value);saved.value=selection.value
+    window.dispatchEvent(new Event('lms:printer-changed'))
+    ElMessage.success('打印机已保存')
+  } catch(e) {selection.value=saved.value;ElMessage.error(e instanceof Error ? e.message : '保存失败')}
+  finally {saving.value=false}
 }
-
-async function save(): Promise<void> {
-  if (!selected.value) return
-  saving.value = true
+async function refresh():Promise<void> {
+  loading.value=true
   try {
-    // 两端都记：本机记名字（打印时要传给打印服务），服务端记工位的绑定打印机
-    setBoundPrinter(selected.value)
-    boundPrinter.value = selected.value
-    await setWorkstationPrinter(props.workstationId, selected.value)
-    ElMessage.success('已保存')
-  } catch (e) {
-    ElMessage.error(e instanceof ApiError ? e.body.message : '保存失败')
-  } finally {
-    saving.value = false
-  }
+    serviceOk.value=await isPrintServiceAlive()
+    printers.value=serviceOk.value ? await listPrinters() : []
+    stationName.value=(await getMachineBinding())?.name ?? ''
+    saved.value=getBoundPrinter() ?? '';selection.value=saved.value
+    if(!saved.value && serviceOk.value) {
+      selection.value=await getDefaultPrinter() ?? ''
+      if(selection.value && printers.value.includes(selection.value)) await save()
+    }
+  } catch(e) {ElMessage.error(e instanceof Error ? e.message : '读取工位状态失败')}
+  finally {loading.value=false}
 }
-
-onMounted(async () => {
-  start()
-  await refresh()
-})
+async function testPrint():Promise<void> {
+  testing.value=true
+  try {
+    const result=await print({...testLabel(new Date()),deviceName:saved.value})
+    if(!result.ok) throw new Error(result.error ?? '测试打印失败')
+    ElMessage.success('已发送一张测试标签')
+  } catch(e) {ElMessage.error(e instanceof Error ? e.message : '测试打印失败')}
+  finally {testing.value=false}
+}
+onMounted(refresh)
 </script>
-
 <style scoped>
-.settings {
-  max-width: 720px;
-}
-.form {
-  margin-top: 16px;
-}
-.hint {
-  margin-left: 12px;
-  font-size: 12px;
-  color: #888;
-}
+.service-details {margin-top:16px;}
+.hint {color:var(--lms-muted);font-size:13px;margin:14px 0;}
+.printer-choice {display:flex;gap:12px;max-width:600px;}
+.printer-choice .el-select {flex:1;min-width:0;}
 </style>

@@ -1,6 +1,6 @@
 <template>
   <div class="panel">
-    <h3>补打与作废</h3>
+    <h3>{{ me?.role === 'hq_admin' ? '补打与作废' : '码补打' }}</h3>
 
     <el-alert v-if="error" :title="error" type="error" show-icon :closable="false" />
     <el-alert
@@ -34,20 +34,25 @@
 
       <el-form-item>
         <el-button type="primary" :loading="busy" @click="doReprint">补打</el-button>
-        <el-button type="danger" :loading="busy" @click="doVoid">作废</el-button>
+        <el-button v-if="me?.role === 'hq_admin'" type="danger" :loading="busy" @click="doVoid"
+          >作废</el-button
+        >
       </el-form-item>
     </el-form>
 
     <p class="hint">
       补打会派发到该码**最近一次打印的原工位**并自动出纸，无需选择打印机；
-      原工位离线时会被拒绝。作废是不可恢复的终态。
+      原工位离线时会被拒绝。<template v-if="me?.role === 'hq_admin'"
+        >作废是不可恢复的终态。</template
+      >
     </p>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { ref } from 'vue'
+import { onMounted, ref } from 'vue'
+import { fetchMe, type MeUser } from '../../api/auth'
 
 import { ApiError } from '../../api/client'
 import { requestReprint, voidCodes } from '../../api/reprint'
@@ -65,6 +70,10 @@ import {
 const emit = defineEmits<{ done: [] }>()
 
 const codeValue = ref('')
+const me = ref<MeUser | null>(null)
+onMounted(async () => {
+  me.value = await fetchMe()
+})
 const reason = ref('')
 const busy = ref(false)
 const error = ref<string | null>(null)
@@ -72,8 +81,7 @@ const notice = ref<string | null>(null)
 const reasonErrors = ref<Errors>({})
 
 function fail(e: unknown, fallback: string): void {
-  error.value =
-    e instanceof ApiError ? explainError(e.body.error_code, e.body.message) : fallback
+  error.value = e instanceof ApiError ? explainError(e.body.error_code, e.body.message) : fallback
   ElMessage.error(error.value)
 }
 

@@ -21,6 +21,9 @@ export interface Product {
 export const listProducts = (keyword?: string) =>
   request<Product[]>(`/api/v1/products${keyword ? `?keyword=${encodeURIComponent(keyword)}` : ''}`)
 
+export type ProductOption = Pick<Product, 'id' | 'code' | 'name' | 'status'>
+export const listProductOptions = () => request<ProductOption[]>('/api/v1/products/options')
+
 export const createProduct = (json: Record<string, unknown>) =>
   request<Product>('/api/v1/products', { method: 'POST', json })
 

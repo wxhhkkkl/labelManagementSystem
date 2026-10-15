@@ -1,0 +1,19 @@
+{
+  "code": "CERTIFICATE_40X55",
+  "name": "合格证（40×55mm·LOGO留白）",
+  "paper_width_mm": 40,
+  "paper_height_mm": 55,
+  "elements": [
+    { "type": "text", "x": 6.8, "y": 11.5, "width": 6.5, "height": 6.5, "font_size": 4.4, "font_family": "SimSun", "align": "center", "content": "合" },
+    { "type": "text", "x": 16.8, "y": 11.5, "width": 6.5, "height": 6.5, "font_size": 4.4, "font_family": "SimSun", "align": "center", "content": "格" },
+    { "type": "text", "x": 26.8, "y": 11.5, "width": 6.5, "height": 6.5, "font_size": 4.4, "font_family": "SimSun", "align": "center", "content": "证" },
+    { "type": "text", "x": 4.6, "y": 20, "width": 4.5, "height": 15.9, "font_size": 3.25, "font_family": "SimSun", "align": "center", "multiline": true, "content": "扫\n二\n维\n码" },
+    { "type": "qrcode", "x": 13.5, "y": 20.8, "size": 13, "field_name": "code_value", "ec_level": "M" },
+    { "type": "text", "x": 30.9, "y": 20, "width": 4.5, "height": 15.9, "font_size": 3.25, "font_family": "SimSun", "align": "center", "multiline": true, "content": "产\n品\n溯\n源" },
+    { "type": "field", "x": 3, "y": 37.7, "width": 34, "height": 3.8, "font_size": 2.8, "font_family": "Arial", "align": "center", "field_name": "code_value" },
+    { "type": "field", "x": 3, "y": 42.1, "width": 34, "height": 3.8, "font_size": 2.8, "font_family": "Arial", "align": "center", "field_name": "production_batch_no" },
+    { "type": "date", "x": 4.5, "y": 46.7, "width": 13, "height": 4, "font_size": 2.9, "font_family": "Arial", "bold": true, "date_source": "print", "date_format": "YY-MM-DD" },
+    { "type": "text", "x": 19.7, "y": 46.7, "width": 5.3, "height": 4, "font_size": 2.8, "font_family": "Times New Roman", "content": "NO:" },
+    { "type": "serial", "x": 24.8, "y": 46.7, "width": 11.5, "height": 4, "font_size": 2.9, "font_family": "Arial", "bold": true, "serial_digits": 5 }
+  ]
+}

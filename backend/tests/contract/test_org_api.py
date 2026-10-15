@@ -53,9 +53,7 @@ def test_sub_admin_cannot_create_company(client, sub_admin: User):
 
 
 def test_disable_company_keeps_record_queryable(client, db: Session, hq_admin, hq_company):
-    resp = client.post(
-        f"/api/v1/companies/{hq_company.id}/disable", headers=auth_header(hq_admin)
-    )
+    resp = client.post(f"/api/v1/companies/{hq_company.id}/disable", headers=auth_header(hq_admin))
     assert resp.status_code == 200
     assert resp.json()["status"] == "disabled"
 
@@ -161,7 +159,7 @@ def test_workstation_list_filters_by_scope(client, sub_admin: User, hq_company, 
 # ---------- 账号 ----------
 
 
-def test_sub_admin_creates_operator_in_own_company(client, sub_admin, hq_company):
+def test_sub_admin_adds_own_company_operator(client, sub_admin, hq_company):
     resp = client.post(
         "/api/v1/users",
         headers=auth_header(sub_admin),
@@ -256,15 +254,17 @@ def test_duplicate_username_rejected(client, hq_admin, hq_company, sub_admin):
 
 
 def test_disable_self_rejected(client, hq_admin: User):
-    resp = client.post(
-        f"/api/v1/users/{hq_admin.id}/disable", headers=auth_header(hq_admin)
-    )
+    resp = client.post(f"/api/v1/users/{hq_admin.id}/disable", headers=auth_header(hq_admin))
     assert resp.status_code == 422
 
 
 def test_user_list_filters_by_scope(client, sub_admin, hq_company):
-    body = client.get("/api/v1/users", headers=auth_header(sub_admin)).json()
-    assert all(u["company_id"] == hq_company.id for u in body)
+    response = client.get("/api/v1/users", headers=auth_header(sub_admin))
+    assert response.status_code == 200
+    assert all(
+        user["company_id"] == hq_company.id and user["role"] == "operator"
+        for user in response.json()
+    )
 
 
 # ---------- 组织树 ----------

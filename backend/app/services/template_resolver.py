@@ -8,6 +8,7 @@
 """
 
 from dataclasses import dataclass
+from datetime import date
 
 from sqlalchemy.orm import Session
 
@@ -17,6 +18,7 @@ from app.models.code import Code
 from app.models.company import Company
 from app.models.product import Product
 from app.models.template import TemplateVersion
+from app.services.print_identity import ensure_identity, fields_for, requires_identity
 
 
 @dataclass
@@ -50,10 +52,13 @@ def _dynamic_fields(db: Session, code: Code) -> dict[str, str]:
         "company_name": company.name if company else "",
         "code_value": code.code_value,
         "batch_no": order.order_no if order else "",
+        "production_batch_no": code.production_batch_no
+        or ((order.production_batch_no or "") if order else ""),
+        **fields_for(db, code.id),
     }
 
 
-def resolve_for_code(db: Session, code: Code) -> RenderPayload:
+def resolve_for_code(db: Session, code: Code, *, print_day: date | None = None) -> RenderPayload:
     """取该码应使用的模板版本与渲染数据。
 
     版本来源是分配单携带的版本（FR-036：工位打印强制使用分配单携带的版本，
@@ -65,13 +70,14 @@ def resolve_for_code(db: Session, code: Code) -> RenderPayload:
         else None
     )
     if order is None:
-        raise ApiError(
-            ErrorCode.VALIDATION_ERROR, "该码没有关联分配单，无法确定打印模板版本"
-        )
+        raise ApiError(ErrorCode.VALIDATION_ERROR, "该码没有关联分配单，无法确定打印模板版本")
 
     version = db.get(TemplateVersion, order.template_version_id)
     if version is None:
         raise ApiError(ErrorCode.VALIDATION_ERROR, "分配单携带的模板版本不存在")
+
+    if requires_identity(version.elements_json):
+        ensure_identity(db, code.id, print_day)
 
     return RenderPayload(
         template_version_id=version.id,

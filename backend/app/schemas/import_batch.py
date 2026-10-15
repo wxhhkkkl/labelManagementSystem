@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ImportBatchOut(BaseModel):
@@ -12,6 +12,8 @@ class ImportBatchOut(BaseModel):
     batch_no: str
     code_list_filename: str
     mapping_filename: str
+    product_id: int | None = None
+    product_names: list[str] = Field(default_factory=list)
     status: str
     total_rows: int | None
     processed_rows: int

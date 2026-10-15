@@ -1,6 +1,6 @@
 /** 工位软件侧接口（contracts/workstation-api.md）。 */
 
-import { request, setBoundWorkstationId } from './client'
+import { request, setBoundWorkstationId, setBoundPrinter } from './client'
 
 export interface BindResponse {
   workstation_id: number
@@ -31,11 +31,15 @@ export const fetchMe = () => request<MeUser>('/api/v1/auth/me')
 export async function bindWorkstation(workstationId: number): Promise<BindResponse> {
   const result = await request<BindResponse>('/api/v1/workstation/bind', {
     method: 'POST',
-    json: { workstation_id: workstationId },
+    json: { workstation_id: workstationId, machine_id: window.lmsBridge?.machineId },
   })
   setBoundWorkstationId(result.workstation_id)
+  setBoundPrinter(result.printer_name)
   return result
 }
+
+export const listAvailableWorkstations = () => request<BindResponse[]>('/api/v1/workstation/available')
+export const getMachineBinding = () => request<BindResponse | null>(`/api/v1/workstation/binding?machine_id=${encodeURIComponent(window.lmsBridge?.machineId ?? '')}`)
 
 export const sendHeartbeat = (workstationId: number, printServiceOk = true) =>
   request<void>('/api/v1/workstation/heartbeat', {

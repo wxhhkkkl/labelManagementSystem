@@ -53,9 +53,7 @@ def export_code_stock(user: HqAdmin, db: DbSession) -> Response:
     writer = csv.writer(buffer)
     writer.writerow(STOCK_HEADERS)
     for row in rows:
-        total = (
-            row.unallocated + row.allocated + row.printing + row.printed + row.voided
-        )
+        total = row.unallocated + row.allocated + row.printing + row.printed + row.voided
         writer.writerow(
             [
                 row.company_name,
@@ -84,7 +82,10 @@ def reprint_and_void_ledger(
     """补打/作废台账（FR-067）。子公司只能看到本公司的记录（R7）。"""
     scope = Scope(user)
     rows = reports.reprint_ledger(
-        db, scope_company_id=scope.scope_company_id, limit=min(limit, 500)
+        db,
+        scope_company_id=scope.scope_company_id,
+        limit=min(limit, 500),
+        include_void=user.role != "sub_admin",
     )
     return [LedgerEntryOut(**row) for row in rows]
 
@@ -202,9 +203,7 @@ def export_print_details(
             ]
         )
 
-    handle = tempfile.NamedTemporaryFile(
-        suffix=".xlsx", prefix="print-details-", delete=False
-    )
+    handle = tempfile.NamedTemporaryFile(suffix=".xlsx", prefix="print-details-", delete=False)
     workbook.save(handle.name)
     handle.close()
 

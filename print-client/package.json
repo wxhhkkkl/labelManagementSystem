@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "description": "打印管理系统 - 工位软件（Electron）",
-  "main": "dist/main/index.js",
+  "main": "out/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",
     "build": "vue-tsc --noEmit && electron-vite build",
@@ -11,6 +11,7 @@
     "dist:win": "electron-builder --win --ia32 --x64"
   },
   "dependencies": {
+    "@bwip-js/generic": "^4.11.4",
     "element-plus": "^2.8.8"
   },
   "devDependencies": {

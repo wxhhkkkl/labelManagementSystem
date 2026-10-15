@@ -1,0 +1,96 @@
+.station-header { display:flex; align-items:center; justify-content:space-between; gap:20px; flex-wrap:wrap; padding:24px 32px; background:#fff; border-bottom:1px solid var(--lms-line); }
+.station-identity { font-size:13px; color:var(--lms-muted); }
+.app-logo { width:44px; height:44px; flex-shrink:0; display:block; }
+.station-tabs { display:flex; gap:28px; padding:0 32px; background:#fff; border-bottom:1px solid var(--lms-line); }
+.station-tabs button { padding:16px 4px; border:0; border-bottom:2px solid transparent; color:var(--lms-muted); background:transparent; cursor:pointer; font-size:14px; }
+.station-tabs button.active { color:var(--lms-blue); border-bottom-color:var(--lms-blue); font-weight:600; }
+.logout-button { border:0; background:transparent; color:var(--lms-blue); cursor:pointer; font-size:14px; }
+.session-identity { display:flex; flex-direction:column; gap:4px; text-align:right; margin-left:auto; }
+.session-identity strong { color:var(--lms-text); font-weight:600; }
+.default-printer { margin:0; color:var(--lms-muted); font-size:13px; overflow-wrap:anywhere; }
+.print-config .config-body { padding:16px; }
+.print-config .field-label { margin:12px 0 6px; }
+.print-config .field-label:first-child { margin-top:0; }
+.print-config .available-codes { margin:14px 0; }
+.print-config .start-print.el-button { margin-top:16px; }
+.station-content { max-width:1500px; margin:auto; padding:28px 32px; }
+.print .head { display:flex; justify-content:space-between; align-items:center; gap:20px; flex-wrap:wrap; margin-bottom:24px; }
+.print h1 { margin:0 0 6px; font-size:27px; }
+.eyebrow { font-size:11px; color:var(--lms-blue); letter-spacing:1.6px; margin:0 0 6px; }
+.page-description { margin:0; color:var(--lms-muted); font-size:13px; }
+.print-status { display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+.status { font-size:12px; padding:5px 10px; border-radius:6px; }
+.status.ok { background:#edf9f3; color:#138565; }
+.status.bad { background:#fff1f2; color:#d64550; }
+.bound { font-size:13px; color:var(--lms-muted); }
+.print-layout { display:grid; grid-template-columns:320px minmax(0,1fr); gap:22px; }
+.station-panel,.station-shell .tasks { background:#fff; border:1px solid var(--lms-line); border-radius:12px; overflow:hidden; }
+.station-panel>h2,.station-shell .tasks>.head { padding:20px; border-bottom:1px solid var(--lms-line); margin:0; font-size:16px; }
+.station-shell .tasks>.head h3 { margin:0; }
+.config-body { padding:20px; }
+.field-label { display:block; font-size:13px; margin:18px 0 8px; }
+.field-label:first-child { margin-top:0; }
+.print-config .el-select,.print-config .el-input-number { width:100%; }
+.available-codes { margin:22px 0; padding:17px; border-radius:8px; background:var(--lms-soft); color:var(--lms-blue); display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.available-codes strong { font-size:26px; }
+.available-codes small { font-size:12px; font-weight:400; }
+.start-print.el-button { width:100%; height:44px; margin:24px 0 0; }
+.print-config .hint { color:var(--lms-muted); font-size:12px; margin:14px 0 0; }
+.print-results { min-width:0; display:flex; flex-direction:column; gap:22px; }
+.print-results .el-table { --el-table-header-bg-color:#f8faff; }
+.print-results .el-table td.el-table__cell { padding:13px 0; }
+.failure-action { padding:18px 20px; }
+.station-shell .tasks .head { display:flex; flex-wrap:wrap; justify-content:space-between; gap:12px; }
+.station-shell .tasks .hint { color:var(--lms-muted); font-size:12px; }
+.station-shell .bind { max-width:620px; width:calc(100% - 32px); padding:32px; margin:40px auto; background:#fff; border:1px solid var(--lms-line); border-radius:14px; }
+.station-shell .bind h1 { font-size:25px; margin:0 0 12px; }
+.station-shell .bind .hint { color:var(--lms-muted); }
+.station-shell .settings { max-width:900px; padding:28px; background:#fff; border-radius:12px; border:1px solid var(--lms-line); }
+.station-shell .settings>h3 { margin:0 0 24px; font-size:25px; }
+.station-shell .settings .el-form-item__content { gap:10px; }
+@media(max-width:800px) { .station-content { padding:24px 16px; } .print-layout { grid-template-columns:280px minmax(0,1fr); gap:16px; } }
+@media(max-width:640px) { .station-header { padding:20px 16px; } .station-tabs { padding:0 16px; } .print-layout { grid-template-columns:1fr; } .station-shell .bind { margin:24px auto; padding:22px 16px; } .station-shell .settings { padding:20px 16px; } .station-shell .settings .el-select { max-width:100%; } }
+/* 窗口适配视口，长任务仅在面板内滚动。 */
+html,body,#app {height:100%;margin:0;overflow:hidden;}
+.station-shell {height:100dvh;display:flex;flex-direction:column;min-height:0;}
+.station-header {padding:14px 24px;flex-shrink:0;}
+.station-tabs {padding:0 24px;flex-shrink:0;}
+.station-tabs button {padding:12px 4px;}
+.station-content {box-sizing:border-box;width:100%;max-width:1600px;flex:1;min-height:0;margin:0 auto;padding:16px 24px 0;display:flex;flex-direction:column;}
+.station-content>.print {flex:1;min-height:0;display:flex;flex-direction:column;}
+.station-content>.print[style*="display: none"] {display:none!important;}
+.print .head {margin-bottom:12px;gap:10px;flex-shrink:0;}
+.print h1 {font-size:23px;}
+.print-layout {flex:1;min-height:0;grid-template-columns:240px minmax(180px,.8fr) minmax(290px,1.2fr);gap:14px;}
+.station-panel>h2,.station-shell .tasks>.head {padding:12px 16px;font-size:15px;}
+.print-config {overflow:auto;}
+.template-panel {display:flex;flex-direction:column;min-height:0;}
+.template-caption,.preview-note {margin:10px 14px;color:var(--lms-muted);font-size:12px;line-height:1.6;flex-shrink:0;}
+.template-caption {color:var(--lms-text);}
+.print-results {min-height:0;gap:12px;overflow:auto;}
+.print-results>section {flex-shrink:0;}
+.station-shell .tasks {margin-top:0;}
+.print-results .el-empty {padding:12px 0;}
+.print-results .el-empty__description {margin-top:8px;}
+.print-results .el-table td.el-table__cell {padding:6px 0;}
+.failure-action {padding:10px 16px;}
+.station-content>.app-footer {margin:0;padding:10px 0;flex-shrink:0;font-size:11px;}
+.station-shell .settings {box-sizing:border-box;width:100%;max-width:900px;max-height:100%;overflow:auto;padding:20px;}
+.station-shell .settings>h3 {font-size:23px;margin-bottom:16px;}
+.station-shell .bind {box-sizing:border-box;min-height:0;max-height:calc(100dvh - 100px);overflow:auto;margin:16px auto;padding:24px;}
+@media(max-width:900px) {
+ .station-content {padding:12px 12px 0;}
+ .print-layout {grid-template-columns:210px minmax(160px,.8fr) minmax(240px,1fr);gap:10px;}
+ .print .eyebrow,.print .page-description,.print-status .bound {display:none;}
+ .station-header {padding:12px 16px;gap:12px;}
+ .template-caption,.preview-note {margin:8px;font-size:11px;}
+}
+
+@media(max-height:700px) {
+ .print-config .config-body {padding:12px;}
+ .print-config .field-label {margin:10px 0 5px;}
+ .print-config .available-codes {margin:10px 0;padding:10px;}
+ .print-config .available-codes strong {font-size:22px;}
+ .print-config .start-print.el-button {margin-top:12px;height:40px;}
+ .print-config .hint {margin-top:8px;font-size:11px;}
+}

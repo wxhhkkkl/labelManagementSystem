@@ -6,6 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class AllocationCreate(BaseModel):
+    production_batch_no: str | None = Field(default=None, max_length=64)
     company_id: int
     product_id: int
     quantity: int = Field(gt=0)
@@ -22,6 +23,7 @@ class AllocationOrderOut(BaseModel):
 
     id: int
     order_no: str
+    production_batch_no: str | None = None
     company_id: int
     company_name: str | None = None
     product_id: int
@@ -30,6 +32,7 @@ class AllocationOrderOut(BaseModel):
     code_range_from: str | None
     code_range_to: str | None
     template_version_id: int
+    template_name: str | None = None
     allocated_by: int
     allocated_at: datetime
     status: str
@@ -45,6 +48,7 @@ class CodeOut(BaseModel):
 
     id: int
     code_value: str
+    production_batch_no: str | None = None
     status: str
     product_id: int
     company_id: int | None

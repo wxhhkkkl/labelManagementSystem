@@ -22,6 +22,7 @@ from app.models.code_event import CodeEvent
 from app.models.import_batch import ImportBatch
 from app.services import import_errors, import_validator
 from app.services.import_errors import RowError
+from app.services.import_parser import ImportFileError
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +55,9 @@ def error_detail_path(batch_no: str) -> Path:
     return batch_dir(batch_no) / "errors.csv"
 
 
-def _insert_codes(db: Session, batch: ImportBatch, outcome: import_validator.ValidationOutcome) -> None:
+def _insert_codes(
+    db: Session, batch: ImportBatch, outcome: import_validator.ValidationOutcome
+) -> None:
     """分块写入码与其导入事件。
 
     每块 flush 后回查 id：MySQL 的 executemany 不回传主键，而 CodeEvent 需要 code_id。
@@ -70,6 +73,7 @@ def _insert_codes(db: Session, batch: ImportBatch, outcome: import_validator.Val
             [
                 {
                     "code_value": row.code_value,
+                    "production_batch_no": row.production_batch_no,
                     "status": "unallocated",
                     "product_id": row.product_id,
                     "import_batch_id": batch.id,
@@ -119,10 +123,20 @@ def process_batch(db: Session, batch_id: int) -> None:
     db.flush()
 
     try:
-        outcome = import_validator.validate(
+        validator = (
+            import_validator.validate_product_batch
+            if batch.product_id is not None
+            else import_validator.validate
+        )
+        extra = (
+            {"product_id": batch.product_id}
+            if batch.product_id is not None
+            else {"mapping_path": mapping_path(batch.batch_no)}
+        )
+        outcome = validator(
             db,
             code_list_path=code_list_path(batch.batch_no),
-            mapping_path=mapping_path(batch.batch_no),
+            **extra,
             on_progress=lambda done: _update_progress(db, batch, done),
         )
 
@@ -141,11 +155,16 @@ def process_batch(db: Session, batch_id: int) -> None:
 
         if outcome.failed_batch:
             batch.status = "failed"
-            logger.info(
-                "批次 %s 整批拒绝: %s", batch.batch_no, outcome.batch_error_message
-            )
+            logger.info("批次 %s 整批拒绝: %s", batch.batch_no, outcome.batch_error_message)
         else:
             batch.status = "succeeded"
+    except ImportFileError as exc:
+        batch.status = "failed"
+        batch.failure_count = 1
+        batch.finished_at = utcnow()
+        detail = error_detail_path(batch.batch_no)
+        import_errors.write_error_detail(detail, [RowError(1, "", None, "INVALID_FILE", str(exc))])
+        batch.error_detail_path = str(detail)
     except Exception:
         batch.status = "failed"
         batch.finished_at = utcnow()

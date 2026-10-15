@@ -60,6 +60,8 @@ export async function request<T>(
 ): Promise<T> {
   const { json, ...init } = options
   const headers = new Headers(init.headers)
+  const machineId = window.lmsBridge?.machineId
+  if (machineId) headers.set('X-LMS-Machine-ID', machineId)
   const token = getToken()
   if (token) headers.set('Authorization', `Bearer ${token}`)
   if (json !== undefined) headers.set('Content-Type', 'application/json')
@@ -74,6 +76,11 @@ export async function request<T>(
 
   const payload = await resp.json().catch(() => null)
   if (!resp.ok) {
+    if (payload?.error_code === 'WORKSTATION_NOT_BOUND') {
+      setBoundWorkstationId(null)
+      setBoundPrinter(null)
+      window.dispatchEvent(new Event('lms:binding-invalid'))
+    }
     throw new ApiError(
       resp.status,
       payload ?? { error_code: 'UNKNOWN', message: resp.statusText, details: {} },

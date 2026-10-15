@@ -4,13 +4,14 @@
     <el-alert v-if="error" :title="error" type="error" show-icon :closable="false" />
 
     <div class="toolbar">
-      <el-select v-model="companyFilter" placeholder="按公司筛选" clearable @change="load">
-        <el-option
-          v-for="c in companies"
-          :key="c.id"
-          :label="c.name"
-          :value="c.id"
-        />
+      <el-select
+        v-if="me?.role === 'hq_admin'"
+        v-model="companyFilter"
+        placeholder="按公司筛选"
+        clearable
+        @change="load"
+      >
+        <el-option v-for="c in companies" :key="c.id" :label="c.name" :value="c.id" />
       </el-select>
       <el-button type="primary" @click="dialogVisible = true">新建工位</el-button>
     </div>
@@ -19,6 +20,13 @@
       <el-table-column prop="code" label="工位编码" width="140" />
       <el-table-column prop="name" label="工位名称" />
       <el-table-column prop="company_name" label="所属公司" width="180" />
+      <el-table-column label="机器绑定" width="110">
+        <template #default="{ row }"
+          ><el-tag :type="row.machine_bound ? 'success' : 'info'">{{
+            row.machine_bound ? '已绑定' : '未绑定'
+          }}</el-tag></template
+        >
+      </el-table-column>
       <el-table-column prop="printer_name" label="绑定打印机" width="180">
         <template #default="{ row }">{{ row.printer_name ?? '未绑定' }}</template>
       </el-table-column>
@@ -36,8 +44,17 @@
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="120">
+      <el-table-column label="操作" width="180">
         <template #default="{ row }">
+          <el-button
+            v-if="row.machine_bound"
+            size="small"
+            type="warning"
+            link
+            :loading="unbindingId === row.id"
+            @click="unbind(row)"
+            >解绑机器</el-button
+          >
           <el-button
             v-if="row.status === 'active'"
             size="small"
@@ -60,7 +77,7 @@
           <el-input v-model="form.name" />
         </el-form-item>
         <el-form-item label="所属公司" :error="errors.company_id">
-          <el-select v-model="form.company_id">
+          <el-select v-model="form.company_id" :disabled="me?.role === 'sub_admin'">
             <el-option v-for="c in companies" :key="c.id" :label="c.name" :value="c.id" />
           </el-select>
         </el-form-item>
@@ -77,21 +94,48 @@
 </template>
 
 <script setup lang="ts">
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { onMounted, ref } from 'vue'
 
 import { ApiError } from '../../api/client'
+import { fetchMe, type MeUser } from '../../api/auth'
 import {
   createWorkstation,
   disableWorkstation,
   listCompanies,
   listWorkstations,
+  unbindWorkstation,
   type Company,
   type Workstation,
 } from '../../api/org'
 import { isValid, validateWorkstation, type Errors } from '../../utils/validate'
 
 const rows = ref<Workstation[]>([])
+const me = ref<MeUser | null>(null)
+const unbindingId = ref<number | null>(null)
+
+async function unbind(row: Workstation): Promise<void> {
+  if (unbindingId.value !== null) return
+  try {
+    await ElMessageBox.confirm(
+      `确认解绑「${row.name}」的机器？原机器将返回绑定页面，打印机配置会清除。`,
+      '解绑工位机器',
+      { type: 'warning', confirmButtonText: '确认解绑' },
+    )
+  } catch {
+    return
+  }
+  unbindingId.value = row.id
+  try {
+    await unbindWorkstation(row.id)
+    ElMessage.success('工位机器已解绑')
+    await load()
+  } catch (e) {
+    fail(e, '解绑工位失败')
+  } finally {
+    unbindingId.value = null
+  }
+}
 const companies = ref<Company[]>([])
 const companyFilter = ref<number | null>(null)
 const loading = ref(false)
@@ -124,7 +168,12 @@ async function submit(): Promise<void> {
   try {
     await createWorkstation({ ...form.value })
     dialogVisible.value = false
-    form.value = { code: '', name: '', company_id: null, printer_name: '' }
+    form.value = {
+      code: '',
+      name: '',
+      company_id: me.value?.role === 'sub_admin' ? me.value.company_id : null,
+      printer_name: '',
+    }
     await load()
   } catch (e) {
     fail(e, '创建工位失败')
@@ -142,7 +191,16 @@ async function disable(id: number): Promise<void> {
 
 onMounted(async () => {
   try {
-    companies.value = await listCompanies()
+    me.value = await fetchMe()
+    if (me.value.role === 'sub_admin') {
+      const company = me.value.company
+      companies.value = company
+        ? [{ ...company, code: '', contact: null, region: null, status: 'active' }]
+        : []
+      form.value.company_id = me.value.company_id
+    } else {
+      companies.value = await listCompanies()
+    }
   } catch (e) {
     fail(e, '加载公司列表失败')
   }

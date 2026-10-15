@@ -47,8 +47,10 @@ def available_count(
     code_range_to: str | None = None,
 ) -> int:
     """池中该产品可分配的码量，用于分配前的可用量校验。"""
-    stmt = select(func.count()).select_from(Code).where(
-        Code.status == POOL_STATUS, Code.product_id == product_id
+    stmt = (
+        select(func.count())
+        .select_from(Code)
+        .where(Code.status == POOL_STATUS, Code.product_id == product_id)
     )
     if batch_id is not None:
         stmt = stmt.where(Code.import_batch_id == batch_id)
@@ -111,6 +113,7 @@ def allocate(
     quantity: int,
     operator_id: int,
     template_version_id: int | None = None,
+    production_batch_no: str | None = None,
     batch_id: int | None = None,
     code_range_from: str | None = None,
     code_range_to: str | None = None,
@@ -121,13 +124,12 @@ def allocate(
     _assert_company_can_receive(db, company_id)
     product = _assert_product_allocatable(db, product_id)
     version = _resolve_template_version(db, product, template_version_id)
+    production_batch_no = (production_batch_no or "").strip() or None
 
     # 先把模板版本行锁住并置冻结（FR-034），**必须在取码之前**。
     # 否则两个并发事务会各自先拿住一批码行、再回头更新同一个版本行，
     # 形成交叉等待而死锁（实测报 1213 Deadlock）。
-    db.execute(
-        select(TemplateVersion).where(TemplateVersion.id == version.id).with_for_update()
-    )
+    db.execute(select(TemplateVersion).where(TemplateVersion.id == version.id).with_for_update())
     # 冻结逻辑集中在模板服务，新增引用点时不会漏（FR-034）
     template_service.freeze_version(db, version.id)
 
@@ -177,8 +179,21 @@ def allocate(
             {"available": len(codes), "requested": quantity},
         )
 
+    if (
+        any(
+            el.get("field_name") == "production_batch_no"
+            for el in version.elements_json.get("elements", [])
+        )
+        and not production_batch_no
+        and any(not code.production_batch_no for code in codes)
+    ):
+        raise ApiError(
+            ErrorCode.VALIDATION_ERROR, "选中的码缺少生产批号，请填写生产批号或导入含产品批号的码表"
+        )
+
     order = AllocationOrder(
         order_no=_new_order_no(),
+        production_batch_no=production_batch_no,
         company_id=company_id,
         product_id=product_id,
         code_count=len(codes),

@@ -12,9 +12,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, PkMixin, TimestampMixin
 
-CodeStatus = Enum(
-    "unallocated", "allocated", "printing", "printed", "voided", name="code_status"
-)
+CodeStatus = Enum("unallocated", "allocated", "printing", "printed", "voided", name="code_status")
 
 
 class Code(PkMixin, TimestampMixin, Base):
@@ -33,6 +31,7 @@ class Code(PkMixin, TimestampMixin, Base):
 
     # 100 位以内、仅数字与字母（FR-015）；全库唯一，已作废的码仍占用该约束
     code_value: Mapped[str] = mapped_column(String(100), nullable=False, unique=True)
+    production_batch_no: Mapped[str | None] = mapped_column(String(64))
     status: Mapped[str] = mapped_column(CodeStatus, nullable=False, default="unallocated")
     product_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("product.id"), nullable=False)
     company_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("company.id"))

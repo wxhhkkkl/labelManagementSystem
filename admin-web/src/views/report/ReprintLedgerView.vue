@@ -1,12 +1,12 @@
 <template>
   <div>
-    <h2>补打 / 作废台账</h2>
+    <h2>{{ me?.role === 'hq_admin' ? '补打 / 作废台账' : '补打明细' }}</h2>
     <p class="hint">供审计使用：每条记录都带必填原因与操作人。子公司只能看到本公司的记录。</p>
 
     <el-alert v-if="error" :title="error" type="error" show-icon :closable="false" />
 
     <div class="toolbar">
-      <el-radio-group v-model="kindFilter">
+      <el-radio-group v-if="me?.role === 'hq_admin'" v-model="kindFilter">
         <el-radio-button value="">全部</el-radio-button>
         <el-radio-button value="reprint">补打</el-radio-button>
         <el-radio-button value="void">作废</el-radio-button>
@@ -52,10 +52,15 @@
 import { computed, onMounted, ref } from 'vue'
 
 import { ApiError } from '../../api/client'
+import { fetchMe, type MeUser } from '../../api/auth'
 import { listLedger, type LedgerEntry } from '../../api/reprint'
 import { ledgerKindLabel, taskStatusLabel } from '../../utils/reprint'
 
 const entries = ref<LedgerEntry[]>([])
+const me = ref<MeUser | null>(null)
+onMounted(async () => {
+  me.value = await fetchMe()
+})
 const kindFilter = ref('')
 const loading = ref(false)
 const error = ref<string | null>(null)

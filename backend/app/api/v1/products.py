@@ -3,10 +3,14 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Depends
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.db import get_db
 from app.core.deps import ClientIp, CurrentUser, HqAdmin
+from app.core.scope import Scope
+from app.models.code import Code
+from app.models.product import Product
 from app.schemas.product import ProductCreate, ProductOut, ProductStatsOut, ProductUpdate
 from app.services import audit
 from app.services import product as product_service
@@ -43,10 +47,28 @@ def _serialize(product, stats: ProductStats) -> ProductOut:
 
 
 @router.get("", response_model=list[ProductOut])
-def list_products(user: CurrentUser, db: DbSession, keyword: str | None = None):
+def list_products(user: HqAdmin, db: DbSession, keyword: str | None = None):
     # 产品是总部统一管理的全局数据，子公司只读可见（不按组织过滤）
     rows = product_service.list_products(db, keyword=keyword)
     return [_serialize(product, stats) for product, stats in rows]
+
+
+@router.get("/options")
+def product_options(user: CurrentUser, db: DbSession):
+    query = select(Product)
+    scope = Scope(user)
+    if not scope.is_hq:
+        if user.company_id is None:
+            return []
+        query = (
+            query.join(Code, Code.product_id == Product.id)
+            .where(Code.company_id == user.company_id)
+            .distinct()
+        )
+    rows = db.scalars(query.order_by(Product.code)).all()
+    return [
+        {"id": row.id, "code": row.code, "name": row.name, "status": row.status} for row in rows
+    ]
 
 
 @router.post("", response_model=ProductOut, status_code=201)

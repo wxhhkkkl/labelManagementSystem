@@ -19,6 +19,7 @@
 
     <el-table v-loading="loading" :data="page.items" border size="small">
       <el-table-column prop="code_value" label="码值" width="220" />
+      <el-table-column prop="production_batch_no" label="产品批号" width="220" />
       <el-table-column label="状态" width="120">
         <template #default="{ row }">
           <el-tag :type="statusTag(row.status)" size="small">{{ statusLabel(row.status) }}</el-tag>
@@ -48,7 +49,7 @@ import { onMounted, ref } from 'vue'
 
 import { ApiError } from '../../api/client'
 import { listCodes, type CodePage } from '../../api/allocation'
-import { listProducts, type Product } from '../../api/product'
+import { listProductOptions, type ProductOption } from '../../api/product'
 
 const STATUSES = [
   { value: 'unallocated', label: '待分配' },
@@ -62,7 +63,7 @@ const STATUS_LABELS: Record<string, string> = Object.fromEntries(
   STATUSES.map((s) => [s.value, s.label]),
 )
 
-const products = ref<Product[]>([])
+const products = ref<ProductOption[]>([])
 const loading = ref(false)
 const error = ref<string | null>(null)
 const filters = ref<{ product_id?: number; status?: string }>({})
@@ -106,7 +107,10 @@ function onPage(next: number): void {
 
 onMounted(async () => {
   try {
-    products.value = await listProducts()
+    products.value = await listProductOptions()
+    if (filters.value.product_id == null && products.value.length === 1) {
+      filters.value.product_id = products.value[0].id
+    }
   } catch {
     // 产品列表拉不到不影响查码池
   }

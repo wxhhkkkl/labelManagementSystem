@@ -53,12 +53,12 @@ class TestDashboardEndpoint:
     def test_requires_authentication(self, client):
         assert client.get("/api/v1/dashboard/code-distribution").status_code == 401
 
-    def test_sub_admin_can_access(self, client, sub_admin: User, printed):
+    def test_sub_admin_cannot_access_dashboard(self, client, sub_admin: User, printed):
         assert (
             client.get(
                 "/api/v1/dashboard/code-distribution", headers=auth_header(sub_admin)
             ).status_code
-            == 200
+            == 403
         )
 
 

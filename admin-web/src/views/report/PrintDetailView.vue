@@ -67,7 +67,7 @@ import { onMounted, ref } from 'vue'
 
 import { ApiError } from '../../api/client'
 import { listWorkstations, type Workstation } from '../../api/org'
-import { listProducts, type Product } from '../../api/product'
+import { listProductOptions, type ProductOption } from '../../api/product'
 import {
   exportPrintDetails,
   fetchPrintDetails,
@@ -76,7 +76,7 @@ import {
 } from '../../api/report'
 
 const rows = ref<PrintDetail[]>([])
-const products = ref<Product[]>([])
+const products = ref<ProductOption[]>([])
 const workstations = ref<Workstation[]>([])
 const range = ref<[string, string] | null>(null)
 const filters = ref<PrintDetailParams>({})
@@ -140,7 +140,10 @@ async function onExport(): Promise<void> {
 
 onMounted(async () => {
   try {
-    products.value = await listProducts()
+    products.value = await listProductOptions()
+    if (filters.value.product_id == null && products.value.length === 1) {
+      filters.value.product_id = products.value[0].id
+    }
   } catch {
     // 产品列表拿不到不影响查明细
   }

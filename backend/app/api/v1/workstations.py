@@ -34,6 +34,7 @@ def serialize(db: Session, ws: Workstation) -> WorkstationOut:
         status=ws.status,
         last_heartbeat_at=ws.last_heartbeat_at,
         online=ws_service.is_online(ws),
+        machine_bound=ws.machine_id is not None,
         operator_ids=ws_service.get_operator_ids(db, ws.id),
     )
 
@@ -46,9 +47,7 @@ def list_workstations(user: AnyAdmin, db: DbSession, company_id: int | None = No
 
 
 @router.post("", response_model=WorkstationOut, status_code=201)
-def create_workstation(
-    payload: WorkstationCreate, user: AnyAdmin, db: DbSession, ip: ClientIp
-):
+def create_workstation(payload: WorkstationCreate, user: AnyAdmin, db: DbSession, ip: ClientIp):
     scope = Scope(user)
     ws = ws_service.create_workstation(db, scope, **payload.model_dump())
     audit.record(
@@ -75,9 +74,7 @@ def update_workstation(
     ip: ClientIp,
 ):
     scope = Scope(user)
-    ws = ws_service.update_workstation(
-        db, scope, workstation_id, **payload.model_dump()
-    )
+    ws = ws_service.update_workstation(db, scope, workstation_id, **payload.model_dump())
     audit.record(
         db,
         operator_id=user.id,
@@ -94,9 +91,7 @@ def update_workstation(
 
 
 @router.post("/{workstation_id}/disable", response_model=WorkstationOut)
-def disable_workstation(
-    workstation_id: int, user: AnyAdmin, db: DbSession, ip: ClientIp
-):
+def disable_workstation(workstation_id: int, user: AnyAdmin, db: DbSession, ip: ClientIp):
     scope = Scope(user)
     ws = ws_service.disable_workstation(db, scope, workstation_id)
     audit.record(
@@ -106,6 +101,25 @@ def disable_workstation(
         action=audit.AuditAction.WORKSTATION_CHANGE,
         result=audit.AuditResult.SUCCESS,
         company_id=ws.company_id,
+        target_type="workstation",
+        target_id=ws.id,
+        ip=ip,
+    )
+    db.commit()
+    return serialize(db, ws)
+
+
+@router.post("/{workstation_id}/unbind", response_model=WorkstationOut)
+def unbind_workstation(workstation_id: int, user: AnyAdmin, db: DbSession, ip: ClientIp):
+    ws = ws_service.unbind_workstation(db, Scope(user), workstation_id)
+    audit.record(
+        db,
+        operator_id=user.id,
+        role=user.role,
+        action="workstation_unbind",
+        result=audit.AuditResult.SUCCESS,
+        company_id=ws.company_id,
+        workstation_id=ws.id,
         target_type="workstation",
         target_id=ws.id,
         ip=ip,

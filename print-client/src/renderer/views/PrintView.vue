@@ -1,90 +1,62 @@
 <template>
   <div class="print">
-    <header class="head">
-      <h1>工位打印</h1>
-      <span class="status" :class="serviceOk ? 'ok' : 'bad'">
-        {{ serviceOk ? '打印服务正常' : '打印服务未启动' }}
-      </span>
-      <span v-if="boundName" class="bound">工位：{{ boundName }}</span>
-    </header>
-
+    <header class="head"><div><p class="eyebrow">PRINT WORKSPACE</p><h1>工位打印</h1><p class="page-description">选择产品、查看模板并按数量打印。</p></div><div class="print-status"><span class="status" :class="serviceOk ? 'ok' : 'bad'">{{ serviceOk ? '打印服务正常' : '打印服务未启动' }}</span><span v-if="boundName" class="bound">工位：{{ boundName }}</span></div></header>
     <el-alert v-if="error" :title="error" type="error" show-icon :closable="false" />
-
-    <section class="row">
-      <el-select v-model="productId" placeholder="选择产品" @change="loadCodes">
-        <el-option v-for="p in products" :key="p.id" :label="p.name" :value="p.id" />
-      </el-select>
-
-      <el-select v-model="printerName" placeholder="选择打印机">
-        <el-option v-for="name in printers" :key="name" :label="name" :value="name" />
-      </el-select>
-
-      <el-input v-model="scanValue" placeholder="扫码或输入码值定位" style="width: 240px" />
-      <el-button @click="locate">定位</el-button>
-    </section>
-
-    <p class="hint">
-      本公司本产品共有 <strong>{{ total }}</strong> 个可打印的码。码在公司内由全部工位共享，
-      不会限定到某个工位。
-    </p>
-
-    <section class="row">
-      <el-input-number v-model="quantity" :min="1" :max="Math.max(total, 1)" />
-      <el-button type="primary" :loading="printing" :disabled="!canPrint" @click="doPrint">
-        打印
-      </el-button>
-    </section>
-
-    <section>
-      <h3>本次任务</h3>
-      <el-table v-if="task.length" :data="task" border size="small">
-        <el-table-column prop="code_value" label="码值" width="240" />
-        <el-table-column label="结果" width="140">
-          <template #default="{ row }">
-            <el-tag :type="tagType(row)" size="small">{{ tagLabel(row) }}</el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="说明">
-          <template #default="{ row }">{{ row.message ?? '—' }}</template>
-        </el-table-column>
-      </el-table>
-      <el-empty v-else description="尚未发起打印" />
-
-      <el-button
-        v-if="hasLocked"
-        type="warning"
-        :loading="confirming"
-        @click="doConfirmFailed"
-      >
-        标记失败并回退
-      </el-button>
-    </section>
-
-    <TaskView
-      v-if="workstationId"
-      :workstation-id="workstationId"
-      :printer-name="printerName"
-      :service-ok="serviceOk"
-    />
+    <div class="print-layout">
+      <section class="print-config station-panel">
+        <h2>打印配置</h2>
+        <div class="config-body">
+          <label class="field-label">产品</label>
+          <el-select v-model="productId" placeholder="选择产品" aria-label="选择产品" @change="loadCodes"><el-option v-for="p in products" :key="p.id" :label="p.name" :value="p.id" /></el-select>
+          <label class="field-label">当前打印机</label>
+          <p class="default-printer">{{ printerName || '请到工位状态选择打印机' }}</p>
+          <div class="available-codes"><span>当前可打印码</span><strong>{{ total }} <small>个</small></strong></div>
+          <label class="field-label">打印数量</label>
+          <el-input-number v-model="quantity" :min="1" :max="Math.max(total, 1)" aria-label="打印数量" />
+          <el-button class="start-print" type="primary" :loading="printing" :disabled="!canPrint" @click="doPrint">开始打印</el-button>
+          <p class="hint">可打印码由本公司全部工位共享。打印失败后可标记并回退。</p>
+        </div>
+      </section>
+      <section class="station-panel template-panel">
+        <h2>当前模板</h2>
+        <template v-if="preview">
+          <p class="template-caption">{{ preview.name }} · V{{ preview.version_no }}<br>{{ preview.elements_json.paper_width_mm }} × {{ preview.elements_json.paper_height_mm }} mm</p>
+          <TemplatePreview :doc="preview.elements_json" :data="preview.data" />
+          <p class="preview-note">下一张待打印码的模板。日期、流水号空白处将在首次打印时生成。</p>
+        </template>
+        <el-empty v-else :image-size="64" description="暂无待打印模板" />
+      </section>
+      <div class="print-results">
+        <section class="station-panel">
+          <h2>本次任务</h2>
+          <el-table v-if="task.length" :data="task" size="small" height="140"><el-table-column prop="code_value" label="码值" min-width="200" /><el-table-column label="结果" width="140"><template #default="{ row }"><el-tag :type="tagType(row)" size="small">{{ tagLabel(row) }}</el-tag></template></el-table-column><el-table-column label="说明" min-width="160"><template #default="{ row }">{{ row.message ?? '—' }}</template></el-table-column></el-table>
+          <el-empty v-else :image-size="40" description="尚未发起打印" />
+          <div v-if="hasLocked" class="failure-action"><el-button type="warning" :loading="confirming" @click="doConfirmFailed">标记失败并回退</el-button></div>
+        </section>
+        <TaskView v-if="workstationId" :workstation-id="workstationId" :printer-name="printerName" :service-ok="serviceOk" />
+      </div>
+    </div>
   </div>
 </template>
-
 <script setup lang="ts">
 import { ElMessage } from 'element-plus'
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 
-import { ApiError, getBoundWorkstationId } from '../api/client'
+import { ApiError, getBoundWorkstationId, getBoundPrinter, setBoundPrinter, request } from '../api/client'
+import { getMachineBinding, setWorkstationPrinter } from '../api/workstation'
 import {
   confirmPrint,
   listPrintableCodes,
   startPrint,
-  scanCode,
   type AcceptedPrint,
   type PrintableCode,
 } from '../api/print'
-import { isPrintServiceAlive, listPrinters, print } from '../api/print-service'
+import { isPrintServiceAlive, getDefaultPrinter, listPrinters, print } from '../api/print-service'
 import { useHeartbeat } from '../composables/useHeartbeat'
 import TaskView from './TaskView.vue'
+import TemplatePreview from '../components/TemplatePreview.vue'
+import type { TemplateDoc } from '../../print-render/renderer'
+const preview = ref<{name:string; version_no:number; elements_json:TemplateDoc; data:Record<string,string>} | null>(null)
 
 interface TaskRow {
   code_value: string
@@ -95,10 +67,8 @@ interface TaskRow {
 const workstationId = ref<number | null>(null)
 const boundName = ref<string | null>(null)
 const products = ref<{ id: number; name: string }[]>([])
-const printers = ref<string[]>([])
 const productId = ref<number | null>(null)
 const printerName = ref<string>('')
-const scanValue = ref('')
 const quantity = ref(1)
 const total = ref(0)
 const codes = ref<PrintableCode[]>([])
@@ -112,7 +82,7 @@ const serviceOk = ref(false)
 const error = ref<string | null>(null)
 
 const canPrint = computed(
-  () => !!workstationId.value && !!productId.value && total.value > 0 && !printing.value,
+  () => !!workstationId.value && !!productId.value && !!printerName.value && serviceOk.value && total.value > 0 && !printing.value,
 )
 const hasLocked = computed(() => locked.value.length > 0)
 
@@ -139,49 +109,56 @@ function fail(e: unknown, fallback: string): void {
 
 async function refreshServiceStatus(): Promise<void> {
   serviceOk.value = await isPrintServiceAlive()
-  if (serviceOk.value && printers.value.length === 0) {
+  if (serviceOk.value) {
     try {
-      printers.value = await listPrinters()
+      const saved = getBoundPrinter()
+      const selected = saved ?? await getDefaultPrinter() ?? ''
+      printerName.value = (await listPrinters()).includes(selected) ? selected : ''
+      if (!saved && printerName.value && workstationId.value) {
+        await setWorkstationPrinter(workstationId.value, selected)
+        setBoundPrinter(selected)
+      }
     } catch {
-      printers.value = []
+      printerName.value = ''
     }
   }
 }
 
+let codeRequest = 0
 async function loadCodes(): Promise<void> {
+  const currentRequest = ++codeRequest
+  preview.value = null
+  codes.value = []; total.value = 0
   if (!workstationId.value || !productId.value) return
   try {
     const page = await listPrintableCodes(workstationId.value, productId.value)
+    if (currentRequest !== codeRequest) return
     codes.value = page.items
     total.value = page.total
     quantity.value = Math.min(quantity.value, Math.max(page.total, 1))
+    const nextPreview = await request<typeof preview.value>(`/api/v1/workstation/template?workstation_id=${workstationId.value}&product_id=${productId.value}`)
+    if(currentRequest === codeRequest) preview.value = nextPreview
   } catch (e) {
     fail(e, '加载可打印码失败')
-  }
-}
-
-async function locate(): Promise<void> {
-  if (!workstationId.value || !scanValue.value) return
-  try {
-    const found = await scanCode(workstationId.value, scanValue.value)
-    productId.value = found.product_id
-    await loadCodes()
-    ElMessage.success(`已定位到 ${found.code_value}`)
-  } catch (e) {
-    fail(e, '定位失败')
   }
 }
 
 async function doPrint(): Promise<void> {
   if (!workstationId.value || !productId.value) return
   error.value = null
+  await refreshServiceStatus()
+  if (!serviceOk.value || !printerName.value) {
+    ElMessage.warning('请到工位状态选择可用打印机，并确认打印服务正常')
+    return
+  }
   printing.value = true
+  const activePrinter = printerName.value
 
   try {
     const selected = codes.value.slice(0, quantity.value).map((c) => c.code_value)
 
     // 1) 预占：服务端把码置为"打印中"并返回模板
-    const response = await startPrint(workstationId.value, selected, printerName.value || undefined)
+    const response = await startPrint(workstationId.value, selected, activePrinter)
 
     task.value = [
       ...response.accepted.map(
@@ -209,11 +186,11 @@ async function doPrint(): Promise<void> {
       const outcome = await print({
         doc: item.elements_json,
         data: item.data,
-        deviceName: printerName.value,
+        deviceName: activePrinter,
       })
       results.push(
         outcome.ok
-          ? { code_value: item.code_value, outcome: 'succeeded' as const, printer_name: printerName.value }
+          ? { code_value: item.code_value, outcome: 'succeeded' as const, printer_name: activePrinter }
           : {
               code_value: item.code_value,
               outcome: 'failed' as const,
@@ -285,7 +262,20 @@ const heartbeat = useHeartbeat(
 )
 
 onMounted(async () => {
+  window.addEventListener('lms:printer-changed', refreshServiceStatus)
   workstationId.value = getBoundWorkstationId()
+  try {
+    const currentBinding = await getMachineBinding()
+    boundName.value = currentBinding?.name ?? null
+    const items = await request<{ id: number; name: string; status: string }[]>('/api/v1/products/options')
+    products.value = items.filter(product => product.status === 'active')
+    if (productId.value === null && products.value.length === 1) {
+      productId.value = products.value[0].id
+      await loadCodes()
+    }
+  } catch (e) {
+    fail(e, '加载产品失败')
+  }
   await refreshServiceStatus()
   if (workstationId.value) heartbeat.start()
   // 打印服务可能稍后才起来（或中途重启），定期探测而不是只测一次
@@ -295,38 +285,6 @@ onMounted(async () => {
 onUnmounted(() => {
   if (poll !== null) clearInterval(poll)
   heartbeat.stop()
+  window.removeEventListener('lms:printer-changed', refreshServiceStatus)
 })
 </script>
-
-<style scoped>
-.print {
-  padding: 16px;
-}
-.head {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-.status {
-  font-size: 13px;
-}
-.status.ok {
-  color: #2e7d32;
-}
-.status.bad {
-  color: #c62828;
-}
-.bound {
-  font-size: 13px;
-  color: #666;
-}
-.row {
-  display: flex;
-  gap: 12px;
-  margin: 12px 0;
-}
-.hint {
-  color: #666;
-  font-size: 13px;
-}
-</style>

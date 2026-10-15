@@ -8,9 +8,9 @@
       </span>
     </header>
 
-    <el-empty v-if="!queue.length" description="暂无补打任务" />
+    <el-empty v-if="!queue.length" description="暂无补打任务" :image-size="40" />
 
-    <el-table v-else :data="queue" border size="small">
+    <el-table v-else :data="queue" height="150" border size="small">
       <el-table-column prop="code_value" label="码值" width="220" />
       <el-table-column prop="product_name" label="产品" />
       <el-table-column prop="reason" label="补打原因" />
@@ -62,8 +62,8 @@ function remove(taskId: number): void {
 async function execute(task: ReprintTask): Promise<void> {
   busyId.value = task.task_id
   try {
-    if (!props.serviceOk) {
-      ElMessage.warning('打印服务未启动，无法出纸')
+    if (!props.serviceOk || !props.printerName) {
+      ElMessage.warning('请先在工位状态选择可用打印机')
       return
     }
 

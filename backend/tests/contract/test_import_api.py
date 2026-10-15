@@ -90,24 +90,25 @@ class TestProductEndpoints:
         assert resp.status_code == 403
         assert resp.json()["error_code"] == "FORBIDDEN_SCOPE"
 
-    def test_sub_admin_can_read_products(self, client, sub_admin, product):
+    def test_sub_admin_cannot_access_product_management(self, client, sub_admin, product):
         resp = client.get("/api/v1/products", headers=auth_header(sub_admin))
-        assert resp.status_code == 200
+        assert resp.status_code == 403
 
 
 # ---------------------------------------------------------------- 导入
 
 
 class TestImportTemplate:
-    def test_template_has_both_sheets(self, client, hq_admin: User):
+    def test_template_matches_product_batch_workbook(self, client, hq_admin: User):
         resp = client.get("/api/v1/imports/template", headers=auth_header(hq_admin))
         assert resp.status_code == 200
         assert "spreadsheetml" in resp.headers["content-type"]
 
         workbook = load_workbook(io.BytesIO(resp.content))
-        assert workbook.sheetnames == ["码清单", "码-产品对照关系"]
-        assert workbook["码清单"]["A1"].value == "码值"
-        assert [c.value for c in workbook["码-产品对照关系"][1]] == ["码值", "产品编码"]
+        assert workbook.sheetnames == ["产品批号表"]
+        assert [c.value for c in workbook.active[1]] == ["防伪码", "产品批号", "状态"]
+        assert workbook.active["A2"].value == "0612286397031613"
+        assert workbook.active["A2"].data_type == "s"
 
     def test_template_requires_hq(self, client, sub_admin):
         resp = client.get("/api/v1/imports/template", headers=auth_header(sub_admin))
@@ -175,9 +176,7 @@ class TestImportUpload:
 
 
 class TestImportQuery:
-    def test_batch_detail_shape(
-        self, client, hq_admin: User, product, import_storage, db: Session
-    ):
+    def test_batch_detail_shape(self, client, hq_admin: User, product, import_storage, db: Session):
         resp = _upload(client, hq_admin, ["Q001"], [("Q001", product.code)])
         batch_id = resp.json()["batch_id"]
 
@@ -197,9 +196,7 @@ class TestImportQuery:
         resp = client.get("/api/v1/imports/999999", headers=auth_header(hq_admin))
         assert resp.status_code == 404
 
-    def test_batch_list_returns_newest_first(
-        self, client, hq_admin: User, product, import_storage
-    ):
+    def test_batch_list_returns_newest_first(self, client, hq_admin: User, product, import_storage):
         first = _upload(client, hq_admin, ["L001"], [("L001", product.code)]).json()["batch_id"]
         second = _upload(client, hq_admin, ["L002"], [("L002", product.code)]).json()["batch_id"]
 
@@ -207,13 +204,13 @@ class TestImportQuery:
         ids = [b["id"] for b in body]
         assert ids.index(second) < ids.index(first)
 
-    def test_errors_download_404_when_none(
-        self, client, hq_admin: User, product, import_storage
-    ):
+    def test_errors_download_404_when_none(self, client, hq_admin: User, product, import_storage):
         resp = _upload(client, hq_admin, ["E001"], [("E001", product.code)])
         batch_id = resp.json()["batch_id"]
         assert (
-            client.get(f"/api/v1/imports/{batch_id}/errors", headers=auth_header(hq_admin)).status_code
+            client.get(
+                f"/api/v1/imports/{batch_id}/errors", headers=auth_header(hq_admin)
+            ).status_code
             == 404
         )
 
@@ -225,9 +222,7 @@ class TestImportQuery:
         batch_id = resp.json()["batch_id"]
         import_worker.process_batch(db, batch_id)
 
-        download = client.get(
-            f"/api/v1/imports/{batch_id}/errors", headers=auth_header(hq_admin)
-        )
+        download = client.get(f"/api/v1/imports/{batch_id}/errors", headers=auth_header(hq_admin))
         assert download.status_code == 200
         text = download.content.decode("utf-8-sig")
         assert "行号" in text

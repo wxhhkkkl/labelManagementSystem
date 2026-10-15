@@ -43,9 +43,7 @@ def create_user(payload: UserCreate, user: AnyAdmin, db: DbSession, ip: ClientIp
 
 
 @router.patch("/{user_id}", response_model=UserOut)
-def update_user(
-    user_id: int, payload: UserUpdate, user: AnyAdmin, db: DbSession, ip: ClientIp
-):
+def update_user(user_id: int, payload: UserUpdate, user: AnyAdmin, db: DbSession, ip: ClientIp):
     scope = Scope(user)
     updated = user_service.update_user(db, scope, user_id, **payload.model_dump())
     audit.record(

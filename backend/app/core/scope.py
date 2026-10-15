@@ -6,7 +6,6 @@
 越权一律返回 403 FORBIDDEN_SCOPE，并由调用方写 AuditLog(result='denied')。
 """
 
-from sqlalchemy.orm import Session
 
 from app.core.deps import HQ_ADMIN, SUB_ADMIN
 from app.core.errors import ApiError, ErrorCode
@@ -32,6 +31,8 @@ class Scope:
         """强制过滤用的公司 ID；None 表示不过滤。"""
         if self.is_hq:
             return None
+        if self.user.company_id is None:
+            raise ApiError(ErrorCode.FORBIDDEN_SCOPE, "账号未关联企业，无法查询企业数据")
         return self.user.company_id
 
     def apply_company_filter(self, stmt, column):

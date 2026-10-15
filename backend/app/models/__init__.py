@@ -11,6 +11,7 @@ from app.models.code_event import CodeEvent
 from app.models.company import Company
 from app.models.import_batch import ImportBatch
 from app.models.print_log import PrintLog
+from app.models.print_identity import PrintIdentity, PrintDailyCounter
 from app.models.print_task import PrintTask
 from app.models.product import Product
 from app.models.template import Template, TemplateVersion
@@ -26,6 +27,8 @@ __all__ = [
     "Company",
     "ImportBatch",
     "PrintLog",
+    "PrintIdentity",
+    "PrintDailyCounter",
     "PrintTask",
     "Product",
     "Template",

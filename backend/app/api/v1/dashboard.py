@@ -12,7 +12,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.core.db import get_db
-from app.core.deps import CurrentUser
+from app.core.deps import HqAdmin
 from app.core.scope import Scope
 from app.services import reports
 
@@ -86,7 +86,7 @@ def _aggregate(rows: list[reports.DashboardRow], group_by: str) -> list[Distribu
 
 @router.get("/code-distribution", response_model=DistributionOut)
 def code_distribution(
-    user: CurrentUser,
+    user: HqAdmin,
     db: DbSession,
     group_by: GroupBy = "company_product",
     created_from: datetime | None = None,

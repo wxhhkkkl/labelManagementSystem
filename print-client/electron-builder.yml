@@ -12,14 +12,15 @@ copyright: Copyright © 2026
 
 directories:
   output: release
-  buildResources: build
+  buildResources: resources
 
 files:
-  - dist/**/*
+  - out/**/*
   - package.json
 
 # 32/64 位都要出包：工厂里的工位电脑不少还是 32 位系统
 win:
+  icon: resources/app.ico
   target:
     - target: nsis
       arch:
@@ -29,6 +30,9 @@ win:
   signAndEditExecutable: true
 
 nsis:
+  installerIcon: resources/app.ico
+  uninstallerIcon: resources/app.ico
+  installerHeaderIcon: resources/app.ico
   oneClick: false
   perMachine: true
   allowToChangeInstallationDirectory: true
@@ -43,4 +47,8 @@ nsis:
 publish: null
 
 extraMetadata:
-  main: dist/main/index.js
+  main: out/main/index.js
+
+extraResources:
+  - from: resources/app.ico
+    to: app.ico

@@ -1,3 +1,5 @@
+import { qrcode, code128, code39, ean13, drawingSVG } from '@bwip-js/generic'
+
 /**
  * 模板渲染规则（实现 contracts/template-rendering.md）。
  *
@@ -16,7 +18,7 @@ export const CSS_PX_PER_MM = 96 / 25.4
 /** 打印侧缩放恒为 100%（契约第 2 节）。 */
 export const PRINT_SCALE_FACTOR = 100
 
-export const ELEMENT_TYPES = ['qrcode', 'barcode', 'text', 'field'] as const
+export const ELEMENT_TYPES = ['qrcode', 'barcode', 'text', 'field', 'date', 'serial'] as const
 export type ElementType = (typeof ELEMENT_TYPES)[number]
 
 export const FONT_FALLBACK = ['微软雅黑', 'monospace']
@@ -28,6 +30,15 @@ export interface TemplateElement {
   size?: number
   width?: number
   height?: number
+  ec_level?: string
+  symbology?: string
+  show_text?: boolean
+  date_format?: string
+  date_source?: string
+  prefix?: string
+  suffix?: string
+  serial_digits?: number
+  multiline?: boolean
   content?: string
   field_name?: string
   font_size?: number
@@ -65,7 +76,9 @@ export function elementSizeMm(el: TemplateElement): { width: number; height: num
       return { width: el.width ?? 0, height: el.height ?? 0 }
     case 'text':
     case 'field':
-      return { width: el.width ?? 0, height: el.font_size ?? 0 }
+    case 'date':
+    case 'serial':
+      return { width: el.width ?? 20, height: el.height ?? el.font_size ?? 3 }
     default:
       return { width: 0, height: 0 }
   }
@@ -114,11 +127,12 @@ export function elementStyle(el: TemplateElement): Record<string, string> {
     boxSizing: 'border-box',
   }
 
-  if (el.type === 'text' || el.type === 'field') {
+  if (['text', 'field', 'date', 'serial'].includes(el.type)) {
     style.fontSize = `${el.font_size ?? 0}mm`
     style.fontFamily = fontFamilyChain(el.font_family)
     style.fontWeight = el.bold ? '700' : '400'
-    style.lineHeight = '1'
+    style.lineHeight = el.height ? '1.2' : '1'
+    style.whiteSpace = el.multiline ? 'pre-wrap' : 'nowrap'
   }
 
   return style
@@ -130,24 +144,96 @@ export interface RenderedElement {
   text: string | null
 }
 
-export function renderTemplate(
-  doc: TemplateDoc,
-  data: Record<string, string>,
-): RenderedElement[] {
+export function renderTemplate(doc: TemplateDoc, data: Record<string, string>): RenderedElement[] {
   return doc.elements.map((original) => {
     const { element } = clipToPaper(original, doc)
-    const text =
-      element.type === 'text'
-        ? (element.content ?? '')
-        : element.type === 'field'
-          ? resolveFieldValue(element.field_name ?? '', data)
-          : null
-    return { element, style: elementStyle(element), text }
+    const text = ['qrcode', 'barcode'].includes(element.type) ? null : elementText(element, data)
+    return { element, style: elementStyle(original), text }
   })
 }
 
 export function paperSize(doc: TemplateDoc): { width: number; height: number } {
   return { width: doc.paper_width_mm, height: doc.paper_height_mm }
+}
+
+/** 日期和编号使用服务端下发的快照；渲染端不会自行递增或读取系统日期。 */
+export function elementText(el: TemplateElement, data: Record<string, string>): string {
+  if (el.type === 'date') {
+    const value =
+      el.date_source === 'fixed' ? (el.content ?? '') : resolveFieldValue('print_date', data)
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return ''
+    const date = new Date(value + 'T00:00:00Z')
+    if (Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== value) return ''
+    const [year, month, day] = value.split('-')
+    return (el.date_format ?? 'YYYY-MM-DD').replace(
+      /YYYY|YY|MM|DD/g,
+      (token) => ({ YYYY: year, YY: year.slice(-2), MM: month, DD: day })[token] ?? '',
+    )
+  }
+  if (el.type === 'serial') {
+    const value = resolveFieldValue('serial_no', data)
+    if (!value) return ''
+    return (el.prefix ?? '') + value.padStart(el.serial_digits ?? 6, '0') + (el.suffix ?? '')
+  }
+  if (el.type === 'text') return el.content ?? ''
+  if (el.type === 'field') return resolveFieldValue(el.field_name ?? '', data)
+  return el.field_name
+    ? resolveFieldValue(el.field_name, data)
+    : (el.content ?? resolveFieldValue('code_value', data))
+}
+
+const graphicCache = new Map<string, string>()
+
+/** 本地生成真实 SVG，不向外部条码服务发送业务码值。 */
+export function graphicSvg(el: TemplateElement, data: Record<string, string>): string {
+  const value = elementText(el, data)
+  if (!value) throw new RenderError('二维码或条码内容不能为空')
+  const key = JSON.stringify([el.type, value, el.ec_level, el.symbology, el.show_text])
+  const cached = graphicCache.get(key)
+  if (cached) return cached
+  const remember = (svg: string) => {
+    if (graphicCache.size >= 100) graphicCache.clear()
+    graphicCache.set(key, svg)
+    return svg
+  }
+  try {
+    const draw = drawingSVG()
+    if (el.type === 'qrcode') {
+      const options = {
+        bcid: 'qrcode',
+        text: value,
+        eclevel: el.ec_level ?? 'M',
+        padding: 4,
+        backgroundcolor: 'FFFFFF',
+      }
+      return remember(qrcode(options, draw))
+    }
+    const encoders = { code128, code39, ean13 }
+    const kind = (el.symbology ?? 'code128') as keyof typeof encoders
+    if (!encoders[kind]) throw new RenderError('不支持的条码制式')
+    return remember(
+      encoders[kind](
+        {
+          bcid: kind,
+          text: value,
+          height: 10,
+          includetext: el.show_text ?? false,
+          textxalign: 'center',
+          padding: 3,
+          backgroundcolor: 'FFFFFF',
+        },
+        draw,
+      ),
+    )
+  } catch (error) {
+    throw new RenderError(
+      '图形编码失败：' + (error instanceof Error ? error.message : String(error)),
+    )
+  }
+}
+
+export function graphicDataUrl(el: TemplateElement, data: Record<string, string>): string {
+  return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(graphicSvg(el, data))
 }
 
 /**
@@ -157,16 +243,23 @@ export function paperSize(doc: TemplateDoc): { width: number; height: number } {
  * 配合主进程固定 scaleFactor=100 实现"所见即所打"。
  */
 export function renderToString(doc: TemplateDoc, data: Record<string, string>): string {
+  for (const el of doc.elements) {
+    if (
+      (el.type === 'serial' || (el.type === 'date' && el.date_source !== 'fixed')) &&
+      !elementText(el, data)
+    ) {
+      throw new RenderError('缺少服务端的首次打印日期或流水号，拒绝打印空白字段')
+    }
+  }
   const body = renderTemplate(doc, data)
     .map(({ element, style, text }) => {
       const css = Object.entries(style)
         .map(([k, v]) => `${k.replace(/[A-Z]/g, (m) => `-${m.toLowerCase()}`)}:${v}`)
         .join(';')
       if (element.type === 'qrcode' || element.type === 'barcode') {
-        // 图形元素由渲染层注入（二维码库/条码库），这里留出占位容器
-        return `<div class="el ${element.type}" data-value="${escapeHtml(text ?? '')}" style="${css}"></div>`
+        return `<div class="el ${element.type}" style="${escapeHtml(css)}"><img alt="" src="${escapeHtml(graphicDataUrl(element, data))}" style="width:100%;height:100%;object-fit:fill" /></div>`
       }
-      return `<div class="el" style="${css}">${escapeHtml(text ?? '')}</div>`
+      return `<div class="el" style="${escapeHtml(css)}">${escapeHtml(text ?? '')}</div>`
     })
     .join('')
 

@@ -1,9 +1,6 @@
 <template>
   <div class="print-preview">
-    <p class="hint">
-      打印预览按与工位端相同的规则换算（同一份 contracts/template-rendering.md），
-      所以这里看到的版面就是实际出纸的版面。
-    </p>
+    <p class="hint">按标签毫米尺寸显示；当前为示例数据，实际打印时使用该码的产品、日期和流水号。</p>
     <TemplatePreview :doc="doc" :data="data" :zoom="zoom" />
   </div>
 </template>

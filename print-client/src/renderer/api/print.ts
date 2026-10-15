@@ -55,11 +55,6 @@ export const listPrintableCodes = (
       `&page=${page}&page_size=${pageSize}`,
   )
 
-export const scanCode = (workstationId: number, codeValue: string) =>
-  request<{ code_value: string; product_id: number; status: string }>(
-    `/api/v1/workstation/codes/${encodeURIComponent(codeValue)}?workstation_id=${workstationId}`,
-  )
-
 /** 预占：返回可打印的模板与数据，以及被拒的码（逐码独立）。 */
 export const startPrint = (
   workstationId: number,

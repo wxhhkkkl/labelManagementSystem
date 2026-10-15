@@ -5,29 +5,36 @@
 """
 
 from typing import Annotated
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, Response, status
 from pydantic import BaseModel, Field
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.db import get_db
 from app.core.deps import ClientIp, CurrentUser
+from app.core.machine import check_bound_machine
 from app.core.scope import Scope
 from app.models.code import Code
 from app.models.company import Company
 from app.models.product import Product
+from app.models.workstation import Workstation
 from app.schemas.reprint import TaskItemOut, TaskListOut, TaskResultOut, TaskResultRequest
 from app.services import audit
 from app.services import print_task as print_task_service
 from app.services import workstation as ws_service
 
-router = APIRouter(prefix="/workstation", tags=["workstation"])
+router = APIRouter(
+    prefix="/workstation", tags=["workstation"], dependencies=[Depends(check_bound_machine)]
+)
 
 DbSession = Annotated[Session, Depends(get_db)]
 
 
 class BindRequest(BaseModel):
     workstation_id: int
+    machine_id: UUID
 
 
 class BindResponse(BaseModel):
@@ -49,7 +56,7 @@ def bind(payload: BindRequest, user: CurrentUser, db: DbSession, ip: ClientIp) -
     校验：归属公司（越权 -> FORBIDDEN_SCOPE）、工位或公司停用（-> WORKSTATION_DISABLED）。
     成功后写 Workstation.bound_at 并刷新心跳，避免刚绑定就被判离线。
     """
-    ws = ws_service.bind_workstation(db, user, payload.workstation_id)
+    ws = ws_service.bind_workstation(db, user, payload.workstation_id, str(payload.machine_id))
     audit.record(
         db,
         operator_id=user.id,
@@ -67,6 +74,50 @@ def bind(payload: BindRequest, user: CurrentUser, db: DbSession, ip: ClientIp) -
         name=ws.name,
         company_id=ws.company_id,
         printer_name=ws.printer_name,
+    )
+
+
+@router.get("/available", response_model=list[BindResponse])
+def available(user: CurrentUser, db: DbSession):
+    company = db.get(Company, user.company_id) if user.company_id else None
+    if company is None or company.status != "active":
+        return []
+    rows = db.scalars(
+        select(Workstation)
+        .where(
+            Workstation.company_id == company.id,
+            Workstation.status == "active",
+            Workstation.machine_id.is_(None),
+        )
+        .order_by(Workstation.code)
+    ).all()
+    return [
+        BindResponse(
+            workstation_id=ws.id,
+            name=ws.name,
+            company_id=ws.company_id,
+            printer_name=ws.printer_name,
+        )
+        for ws in rows
+    ]
+
+
+@router.get("/binding", response_model=BindResponse | None)
+def machine_binding(machine_id: UUID, user: CurrentUser, db: DbSession):
+    ws = db.scalar(select(Workstation).where(Workstation.machine_id == str(machine_id)))
+    if ws is None:
+        return None
+    company = db.get(Company, ws.company_id)
+    if ws.company_id != user.company_id:
+        from app.core.errors import ApiError, ErrorCode
+
+        raise ApiError(ErrorCode.FORBIDDEN_SCOPE, "本机已绑定其他企业工位，请使用该企业账号登录")
+    if ws.status != "active" or company is None or company.status != "active":
+        from app.core.errors import ApiError, ErrorCode
+
+        raise ApiError(ErrorCode.WORKSTATION_DISABLED, "本机绑定的工位或企业已停用")
+    return BindResponse(
+        workstation_id=ws.id, name=ws.name, company_id=ws.company_id, printer_name=ws.printer_name
     )
 
 
@@ -110,7 +161,7 @@ def _task_item(db: Session, task) -> TaskItemOut:
 def list_tasks(
     user: CurrentUser, db: DbSession, workstation_id: int, limit: int = 10
 ) -> TaskListOut:
-    """"领取"本工位的待执行补打任务（FR-055）。
+    """ "领取"本工位的待执行补打任务（FR-055）。
 
     采用原子领取（research.md R1）：并发时每个任务只会被一方拿到。
     **没有任务时不做任何写入**——5 秒一次的轮询不能把库打成写热点。
@@ -158,7 +209,9 @@ def report_task_result(
         operator_id=user.id,
         role=user.role,
         action=audit.AuditAction.REPRINT,
-        result=audit.AuditResult.SUCCESS if payload.result == "succeeded" else audit.AuditResult.FAILED,
+        result=audit.AuditResult.SUCCESS
+        if payload.result == "succeeded"
+        else audit.AuditResult.FAILED,
         company_id=code.company_id if code else None,
         workstation_id=workstation.id,
         target_type="print_task",
@@ -213,6 +266,4 @@ def set_printer(
         ip=ip,
     )
     db.commit()
-    return PrinterResponse(
-        workstation_id=workstation.id, printer_name=workstation.printer_name
-    )
+    return PrinterResponse(workstation_id=workstation.id, printer_name=workstation.printer_name)

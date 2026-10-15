@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.core.db import get_db
-from app.core.deps import ClientIp, CurrentUser, HqAdmin
+from app.core.deps import ClientIp, HqAdmin
 from app.models.template import TemplateVersion
 from app.schemas.template import (
     TemplateCreate,
@@ -38,7 +38,7 @@ def _version_out(version: TemplateVersion) -> TemplateVersionOut:
 
 
 @router.get("", response_model=list[TemplateOut])
-def list_templates(user: CurrentUser, db: DbSession) -> list[TemplateOut]:
+def list_templates(user: HqAdmin, db: DbSession) -> list[TemplateOut]:
     """模板列表。子公司也可见——他们需要知道自己被分配的是哪套模板。"""
     rows = template_service.list_templates(db)
     return [
@@ -81,7 +81,7 @@ def create_template(
 
 
 @router.get("/{template_id}/versions", response_model=list[TemplateVersionOut])
-def list_versions(template_id: int, user: CurrentUser, db: DbSession):
+def list_versions(template_id: int, user: HqAdmin, db: DbSession):
     return [_version_out(v) for v in template_service.list_versions(db, template_id)]
 
 
@@ -138,9 +138,7 @@ def replace_version(
 
 
 @router.post("/{template_id}/disable", response_model=TemplateOut)
-def disable_template(
-    template_id: int, user: HqAdmin, db: DbSession, ip: ClientIp
-) -> TemplateOut:
+def disable_template(template_id: int, user: HqAdmin, db: DbSession, ip: ClientIp) -> TemplateOut:
     """停用模板。只影响后续新分配；已冻结的历史版本继续可用于打印与补打。"""
     template = template_service.disable_template(db, template_id)
     audit.record(

@@ -37,15 +37,12 @@ class CodeStockRow:
 
 def code_stock(db: Session, *, scope_company_id: int | None = None) -> list[CodeStockRow]:
     """按"公司 + 产品"汇总五态码量。"""
-    stmt = (
-        select(
-            Code.company_id,
-            Code.product_id,
-            Code.status,
-            func.count().label("count"),
-        )
-        .group_by(Code.company_id, Code.product_id, Code.status)
-    )
+    stmt = select(
+        Code.company_id,
+        Code.product_id,
+        Code.status,
+        func.count().label("count"),
+    ).group_by(Code.company_id, Code.product_id, Code.status)
     if scope_company_id is not None:
         stmt = stmt.where(Code.company_id == scope_company_id)
 
@@ -72,7 +69,7 @@ def code_stock(db: Session, *, scope_company_id: int | None = None) -> list[Code
 
 
 def reprint_ledger(
-    db: Session, *, scope_company_id: int | None = None, limit: int = 200
+    db: Session, *, scope_company_id: int | None = None, limit: int = 200, include_void: bool = True
 ) -> list[dict]:
     """补打与作废台账（FR-067）。
 
@@ -89,9 +86,10 @@ def reprint_ledger(
 
     entries: list[dict] = []
 
-    tasks = db.execute(
-        select(PrintTask).order_by(PrintTask.id.desc()).limit(limit)
-    ).scalars()
+    task_query = select(PrintTask).join(Code, Code.id == PrintTask.code_id)
+    if scope_company_id is not None:
+        task_query = task_query.where(Code.company_id == scope_company_id)
+    tasks = db.execute(task_query.order_by(PrintTask.id.desc()).limit(limit)).scalars()
     for task in tasks:
         code = db.get(Code, task.code_id)
         if code is None:
@@ -112,12 +110,14 @@ def reprint_ledger(
             }
         )
 
-    voided = db.execute(
-        select(Code)
-        .where(Code.status == "voided")
-        .order_by(Code.voided_at.desc())
-        .limit(limit)
-    ).scalars()
+    void_query = select(Code).where(Code.status == "voided")
+    if scope_company_id is not None:
+        void_query = void_query.where(Code.company_id == scope_company_id)
+    voided = (
+        db.execute(void_query.order_by(Code.voided_at.desc()).limit(limit)).scalars()
+        if include_void
+        else []
+    )
     for code in voided:
         if scope_company_id is not None and code.company_id != scope_company_id:
             continue
@@ -296,5 +296,7 @@ def print_details(
             failure_reason=log.failure_reason,
             printed_at=log.printed_at,
         )
-        for log, product_name, company_name, workstation_name, operator_name in db.execute(stmt).all()
+        for log, product_name, company_name, workstation_name, operator_name in db.execute(
+            stmt
+        ).all()
     ]

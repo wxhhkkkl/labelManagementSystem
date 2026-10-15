@@ -5,10 +5,12 @@
  */
 
 import { describe, expect, it } from 'vitest'
+import { isProxy, reactive } from 'vue'
 
 import {
   addElement,
   clampElement,
+  cloneTemplateDoc,
   createElement,
   elementSummary,
   moveElement,
@@ -25,6 +27,25 @@ const doc: TemplateDoc = {
   paper_height_mm: 40,
   elements: [{ type: 'qrcode', x: 10, y: 10, size: 15 }],
 }
+
+describe('cloneTemplateDoc', () => {
+  it('copies nested reactive template data without sharing mutable state', () => {
+    const source = reactive({
+      ...doc,
+      elements: reactive([
+        reactive({ ...doc.elements[0], metadata: reactive({ label: '二维码' }) }),
+      ]),
+    })
+    const copy = cloneTemplateDoc(source)
+    expect(copy).toEqual(source)
+    expect(isProxy(copy)).toBe(false)
+    expect(isProxy(copy.elements[0].metadata)).toBe(false)
+    copy.elements[0].x = 20
+    ;(copy.elements[0].metadata as { label: string }).label = '副本'
+    expect(source.elements[0].x).toBe(10)
+    expect(source.elements[0].metadata.label).toBe('二维码')
+  })
+})
 
 describe('clampElement', () => {
   it('leaves an in-bounds element alone', () => {

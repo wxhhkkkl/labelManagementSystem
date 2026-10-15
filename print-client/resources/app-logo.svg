@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" fill="none">
+  <title>标签打印系统</title>
+  <defs>
+    <linearGradient id="blue" x1="60" y1="24" x2="450" y2="500" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#3785FF"/><stop offset="1" stop-color="#1647CE"/>
+    </linearGradient>
+  </defs>
+  <rect x="16" y="16" width="480" height="480" rx="112" fill="url(#blue)"/>
+  <path d="M156 184V112C156 98.745 166.745 88 180 88H332C345.255 88 356 98.745 356 112V184" fill="#E5EFFF"/>
+  <path d="M192 124H290M192 148H254" stroke="#6297F5" stroke-width="12" stroke-linecap="round"/>
+  <rect x="80" y="172" width="352" height="190" rx="48" fill="white"/>
+  <circle cx="384" cy="217" r="10" fill="#3B82F6"/>
+  <rect x="132" y="256" width="248" height="28" rx="14" fill="#153FA6"/>
+  <path d="M152 272H360V406C360 420.359 348.359 432 334 432H178C163.641 432 152 420.359 152 406V272Z" fill="white" stroke="#245FDF" stroke-width="12"/>
+  <g fill="#245FDF">
+    <path fill-rule="evenodd" d="M184 306H218V340H184V306ZM194 316V330H208V316H194ZM230 306H264V340H230V306ZM240 316V330H254V316H240ZM184 352H218V386H184V352ZM194 362V376H208V362H194Z"/>
+    <path d="M230 352H242V364H230ZM252 352H264V374H252ZM230 374H242V386H230ZM242 364H252V374H242ZM252 380H264V392H252Z"/>
+    <rect x="282" y="310" width="42" height="12" rx="6"/>
+    <rect x="282" y="336" width="32" height="12" rx="6"/>
+    <rect x="282" y="362" width="42" height="12" rx="6"/>
+  </g>
+</svg>

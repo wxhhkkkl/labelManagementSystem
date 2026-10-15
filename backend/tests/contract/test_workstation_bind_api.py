@@ -21,7 +21,10 @@ def test_bind_sets_bound_at_and_heartbeat(
     resp = client.post(
         "/api/v1/workstation/bind",
         headers=auth_header(operator),
-        json={"workstation_id": workstation.id},
+        json={
+            "workstation_id": workstation.id,
+            "machine_id": "11111111-1111-4111-8111-111111111111",
+        },
     )
     assert resp.status_code == 200
     body = resp.json()
@@ -40,14 +43,20 @@ def test_bind_is_idempotent_on_bound_at(
     client.post(
         "/api/v1/workstation/bind",
         headers=auth_header(operator),
-        json={"workstation_id": workstation.id},
+        json={
+            "workstation_id": workstation.id,
+            "machine_id": "11111111-1111-4111-8111-111111111111",
+        },
     )
     first = workstation.bound_at
 
     client.post(
         "/api/v1/workstation/bind",
         headers=auth_header(operator),
-        json={"workstation_id": workstation.id},
+        json={
+            "workstation_id": workstation.id,
+            "machine_id": "11111111-1111-4111-8111-111111111111",
+        },
     )
     db.refresh(workstation)
     assert workstation.bound_at == first  # 首次绑定时间不被覆盖
@@ -63,7 +72,7 @@ def test_bind_other_company_workstation_is_forbidden(
     resp = client.post(
         "/api/v1/workstation/bind",
         headers=auth_header(operator),
-        json={"workstation_id": foreign.id},
+        json={"workstation_id": foreign.id, "machine_id": "11111111-1111-4111-8111-111111111111"},
     )
     assert resp.status_code == 403
     assert resp.json()["error_code"] == "FORBIDDEN_SCOPE"
@@ -78,7 +87,10 @@ def test_bind_disabled_workstation_rejected(
     resp = client.post(
         "/api/v1/workstation/bind",
         headers=auth_header(operator),
-        json={"workstation_id": workstation.id},
+        json={
+            "workstation_id": workstation.id,
+            "machine_id": "11111111-1111-4111-8111-111111111111",
+        },
     )
     assert resp.status_code == 409
     assert resp.json()["error_code"] == "WORKSTATION_DISABLED"
@@ -94,7 +106,10 @@ def test_bind_workstation_of_disabled_company_rejected(
     resp = client.post(
         "/api/v1/workstation/bind",
         headers=auth_header(operator),
-        json={"workstation_id": workstation.id},
+        json={
+            "workstation_id": workstation.id,
+            "machine_id": "11111111-1111-4111-8111-111111111111",
+        },
     )
     assert resp.status_code == 409
     assert resp.json()["error_code"] == "WORKSTATION_DISABLED"
@@ -104,14 +119,18 @@ def test_bind_unknown_workstation_is_404(client, operator: User):
     resp = client.post(
         "/api/v1/workstation/bind",
         headers=auth_header(operator),
-        json={"workstation_id": 999999},
+        json={"workstation_id": 999999, "machine_id": "11111111-1111-4111-8111-111111111111"},
     )
     assert resp.status_code == 404
 
 
 def test_bind_requires_authentication(client, workstation: Workstation):
     resp = client.post(
-        "/api/v1/workstation/bind", json={"workstation_id": workstation.id}
+        "/api/v1/workstation/bind",
+        json={
+            "workstation_id": workstation.id,
+            "machine_id": "11111111-1111-4111-8111-111111111111",
+        },
     )
     assert resp.status_code == 401
 
@@ -122,7 +141,10 @@ def test_bind_writes_audit_record(client, db: Session, operator: User, workstati
     client.post(
         "/api/v1/workstation/bind",
         headers=auth_header(operator),
-        json={"workstation_id": workstation.id},
+        json={
+            "workstation_id": workstation.id,
+            "machine_id": "11111111-1111-4111-8111-111111111111",
+        },
     )
     rows = db.query(AuditLog).filter(AuditLog.action == "workstation.change").all()
     assert len(rows) == 1

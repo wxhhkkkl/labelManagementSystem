@@ -5,6 +5,7 @@ import { request } from './client'
 export interface AllocationOrder {
   id: number
   order_no: string
+  production_batch_no?: string | null
   company_id: number
   company_name: string | null
   product_id: number
@@ -13,6 +14,7 @@ export interface AllocationOrder {
   code_range_from: string | null
   code_range_to: string | null
   template_version_id: number
+  template_name?: string | null
   allocated_by: number
   allocated_at: string
   status: 'active' | 'reclaimed'
@@ -26,6 +28,7 @@ export interface AllocationCreated {
 export interface CodeItem {
   id: number
   code_value: string
+  production_batch_no?: string | null
   status: string
   product_id: number
   company_id: number | null

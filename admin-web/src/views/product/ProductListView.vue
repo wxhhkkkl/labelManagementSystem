@@ -18,6 +18,9 @@
     <el-table v-loading="loading" :data="rows" border>
       <el-table-column prop="code" label="产品编码" width="140" />
       <el-table-column prop="name" label="产品名称" />
+      <el-table-column label="默认模板" min-width="180" show-overflow-tooltip>
+        <template #default="{ row }">{{ templateName(row.default_template_id) }}</template>
+      </el-table-column>
       <el-table-column prop="spec" label="规格" width="120">
         <template #default="{ row }">{{ row.spec ?? '—' }}</template>
       </el-table-column>
@@ -37,8 +40,16 @@
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="100">
+      <el-table-column label="操作" width="180">
         <template #default="{ row }">
+          <el-button
+            v-if="me?.role === 'hq_admin'"
+            size="small"
+            type="primary"
+            link
+            @click="openBind(row)"
+            >绑定模板</el-button
+          >
           <el-button
             v-if="row.status === 'active'"
             size="small"
@@ -51,6 +62,51 @@
         </template>
       </el-table-column>
     </el-table>
+
+    <el-dialog
+      v-model="bindVisible"
+      title="绑定打印模板"
+      width="480px"
+      :close-on-click-modal="!binding"
+      :close-on-press-escape="!binding"
+      :show-close="!binding"
+    >
+      <el-form label-width="90px">
+        <el-form-item label="产品">{{ bindingProduct?.name }}</el-form-item>
+        <el-form-item label="默认模板">
+          <el-select
+            v-model="bindingTemplateId"
+            placeholder="选择打印模板"
+            style="width: 100%"
+            :disabled="binding"
+          >
+            <el-option
+              v-for="item in bindableTemplates"
+              :key="item.id"
+              :label="`${item.name}（版本 ${item.current_version_no}）`"
+              :value="item.id"
+            />
+          </el-select>
+        </el-form-item>
+      </el-form>
+      <p class="binding-note">新建分配单使用所选模板的当前版本，已有分配单继续使用原版本。</p>
+      <el-alert
+        v-if="!bindableTemplates.length"
+        title="暂无可用模板，请先在模板管理中新建并启用模板。"
+        type="info"
+        :closable="false"
+      />
+      <template #footer>
+        <el-button :disabled="binding" @click="bindVisible = false">取消</el-button>
+        <el-button
+          type="primary"
+          :loading="binding"
+          :disabled="!bindableTemplates.some((item) => item.id === bindingTemplateId)"
+          @click="saveBinding"
+          >保存绑定</el-button
+        >
+      </template>
+    </el-dialog>
 
     <el-dialog v-model="dialogVisible" title="新建产品" width="460px">
       <el-form label-width="90px">
@@ -76,17 +132,62 @@
 
 <script setup lang="ts">
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 
 import { ApiError } from '../../api/client'
+import { fetchMe, type MeUser } from '../../api/auth'
+import { listTemplates, type TemplateItem } from '../../api/template'
 import {
   createProduct,
   disableProduct,
   listProducts,
+  updateProduct,
   type Product,
 } from '../../api/product'
 
 const rows = ref<Product[]>([])
+const me = ref<MeUser | null>(null)
+const templates = ref<TemplateItem[]>([])
+const bindableTemplates = computed(() =>
+  templates.value.filter((item) => item.status === 'active' && item.current_version_no !== null),
+)
+const bindVisible = ref(false)
+const binding = ref(false)
+const bindingProduct = ref<Product | null>(null)
+const bindingTemplateId = ref<number | null>(null)
+
+function templateName(id: number | null): string {
+  if (id === null) return '未绑定'
+  return templates.value.find((item) => item.id === id)?.name ?? `模板 #${id}`
+}
+
+async function openBind(product: Product): Promise<void> {
+  try {
+    templates.value = await listTemplates()
+    bindingProduct.value = product
+    bindingTemplateId.value =
+      product.default_template_id ??
+      (bindableTemplates.value.length === 1 ? bindableTemplates.value[0].id : null)
+    bindVisible.value = true
+  } catch (e) {
+    fail(e, '加载模板失败')
+  }
+}
+
+async function saveBinding(): Promise<void> {
+  if (binding.value || !bindingProduct.value || !bindingTemplateId.value) return
+  binding.value = true
+  try {
+    await updateProduct(bindingProduct.value.id, { default_template_id: bindingTemplateId.value })
+    bindVisible.value = false
+    ElMessage.success('模板已绑定')
+    await load()
+  } catch (e) {
+    fail(e, '绑定模板失败')
+  } finally {
+    binding.value = false
+  }
+}
 const keyword = ref('')
 const loading = ref(false)
 const error = ref<string | null>(null)
@@ -104,6 +205,8 @@ async function load(): Promise<void> {
   error.value = null
   try {
     rows.value = await listProducts(keyword.value || undefined)
+    templates.value = await listTemplates()
+    me.value = await fetchMe()
   } catch (e) {
     fail(e, '加载产品失败')
   } finally {
@@ -150,6 +253,10 @@ onMounted(load)
 </script>
 
 <style scoped>
+.binding-note {
+  color: var(--el-text-color-secondary);
+  font-size: 13px;
+}
 .toolbar {
   display: flex;
   gap: 12px;

@@ -5,23 +5,38 @@
  * 编辑器允许摆出的坐标，MUST 是渲染器接得住的范围。
  */
 
-import { elementSizeMm, type TemplateDoc, type TemplateElement } from './templateRender'
+import { elementSizeMm, graphicSvg, type TemplateDoc, type TemplateElement } from './templateRender'
 
-export const CREATABLE_TYPES = ['qrcode', 'barcode', 'text', 'field'] as const
+export const CREATABLE_TYPES = ['qrcode', 'barcode', 'text', 'field', 'date', 'serial'] as const
+
+/** 模板是接口中的 JSON 文档；通过 JSON 复制兼容 Vue 的嵌套响应式代理。 */
+export function cloneTemplateDoc(doc: TemplateDoc): TemplateDoc {
+  return JSON.parse(JSON.stringify(doc)) as TemplateDoc
+}
 
 export const TYPE_LABELS: Record<string, string> = {
   qrcode: '二维码',
   barcode: '条码',
   text: '文本',
   field: '动态字段',
+  date: '日期',
+  serial: '流水号',
 }
 
 /** 新建元素的默认尺寸（毫米），保证建出来就在纸内且可见。 */
 const DEFAULTS: Record<string, Partial<TemplateElement>> = {
-  qrcode: { size: 15 },
-  barcode: { width: 30, height: 10 },
-  text: { content: '文本', font_size: 3, width: 20 },
-  field: { field_name: 'code_value', font_size: 3, width: 20 },
+  qrcode: { size: 15, field_name: 'code_value', ec_level: 'M' },
+  barcode: {
+    width: 30,
+    height: 10,
+    field_name: 'code_value',
+    symbology: 'code128',
+    show_text: false,
+  },
+  text: { content: '文本', font_size: 3, width: 20, height: 4.2 },
+  field: { field_name: 'code_value', font_size: 3, width: 30, height: 4.2 },
+  date: { date_source: 'print', date_format: 'YYYY-MM-DD', font_size: 3, width: 25, height: 4.2 },
+  serial: { prefix: '', suffix: '', serial_digits: 6, font_size: 3, width: 25, height: 4.2 },
 }
 
 export function typeLabel(type: string): string {
@@ -103,6 +118,10 @@ export function elementSummary(el: TemplateElement): string {
       return `文本「${el.content ?? ''}」`
     case 'field':
       return `动态字段 ${el.field_name ?? ''}`
+    case 'date':
+      return `日期 ${el.date_format ?? 'YYYY-MM-DD'}`
+    case 'serial':
+      return `${el.prefix ?? ''}${'1'.padStart(el.serial_digits ?? 6, '0')}${el.suffix ?? ''}`
     default:
       return el.type
   }
@@ -117,8 +136,8 @@ export function elementSummary(el: TemplateElement): string {
 export function validateDocument(doc: TemplateDoc): string[] {
   const problems: string[] = []
 
-  if (!(doc.paper_width_mm > 0)) problems.push('纸张宽度必须大于 0')
-  if (!(doc.paper_height_mm > 0)) problems.push('纸张高度必须大于 0')
+  if (!(doc.paper_width_mm > 0 && doc.paper_width_mm <= 500)) problems.push('纸张宽度必须大于 0')
+  if (!(doc.paper_height_mm > 0 && doc.paper_height_mm <= 500)) problems.push('纸张高度必须大于 0')
 
   doc.elements.forEach((el, index) => {
     const label = `第 ${index + 1} 个元素（${typeLabel(el.type)}）`
@@ -131,6 +150,56 @@ export function validateDocument(doc: TemplateDoc): string[] {
     }
     if (el.x >= doc.paper_width_mm || el.y >= doc.paper_height_mm) {
       problems.push(`${label}：起点已在纸张之外`)
+    }
+    const size = elementSizeMm(el)
+    if (![el.x, el.y, size.width, size.height].every(Number.isFinite))
+      problems.push(`${label}：位置和尺寸必须为有效数字`)
+    if (!(size.width > 0) || !(size.height > 0)) problems.push(`${label}：宽度和高度必须大于 0`)
+    if (['text', 'field', 'date', 'serial'].includes(el.type) && !(Number(el.font_size) > 0))
+      problems.push(`${label}：字号必须大于 0`)
+    if (
+      el.type === 'date' &&
+      el.date_source === 'fixed' &&
+      (!el.content ||
+        !/^\d{4}-\d{2}-\d{2}$/.test(el.content) ||
+        Number.isNaN(Date.parse(el.content)) ||
+        new Date(el.content).toISOString().slice(0, 10) !== el.content)
+    )
+      problems.push(`${label}：请选择有效的固定日期`)
+    if (
+      el.type === 'serial' &&
+      (!Number.isInteger(el.serial_digits ?? 6) ||
+        Number(el.serial_digits ?? 6) < 1 ||
+        Number(el.serial_digits ?? 6) > 12)
+    )
+      problems.push(`${label}：流水号位数应为 1 至 12`)
+    if (el.type === 'qrcode' || el.type === 'barcode') {
+      if (
+        el.field_name &&
+        ![
+          'code_value',
+          'product_name',
+          'company_name',
+          'batch_no',
+          'production_batch_no',
+          'print_date',
+          'serial_no',
+        ].includes(el.field_name)
+      )
+        problems.push(`${label}：未知的绑定字段`)
+      if (
+        el.type === 'barcode' &&
+        !['code128', 'code39', 'ean13'].includes(el.symbology ?? 'code128')
+      )
+        problems.push(`${label}：不支持的条码制式`)
+      // 动态内容按每个码的实际值校验，不能用预览样例限制可保存的模板。
+      if (!el.field_name && el.content != null) {
+        try {
+          graphicSvg(el, {})
+        } catch (error) {
+          problems.push(`${label}：${error instanceof Error ? error.message : String(error)}`)
+        }
+      }
     }
     if (el.type === 'field' && !el.field_name) {
       problems.push(`${label}：必须指定动态字段名`)

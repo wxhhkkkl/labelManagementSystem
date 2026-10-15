@@ -9,6 +9,7 @@ import type { TemplateDoc } from '../../print-render/renderer'
 import { renderToString } from '../../print-render/renderer'
 
 interface Bridge {
+  machineId: string
   printServicePort: number
   printServiceToken: string
 }
@@ -54,6 +55,13 @@ export interface PrintRequest {
   doc: TemplateDoc
   data: Record<string, string>
   deviceName: string
+}
+
+export async function getDefaultPrinter(): Promise<string | null> {
+  const response = await fetch(`${baseUrl()}/default-printer`, { headers: { 'X-Print-Token': token() } })
+  if (!response.ok) throw new PrintServiceUnavailable('无法读取系统默认打印机')
+  const data = await response.json() as { printer: string | null }
+  return data.printer
 }
 
 export async function print(

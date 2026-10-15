@@ -77,10 +77,10 @@ import {
 } from '../../api/report'
 
 const STATES = [
-  { key: 'unallocated' as const, label: '待分配', color: '#909399' },
-  { key: 'allocated_not_printed' as const, label: '已分配未打印', color: '#409EFF' },
-  { key: 'printed' as const, label: '已打印', color: '#67C23A' },
-  { key: 'voided' as const, label: '已作废', color: '#F56C6C' },
+  { key: 'unallocated' as const, label: '待分配', color: '#687C99' },
+  { key: 'allocated_not_printed' as const, label: '已分配未打印', color: '#2563EB' },
+  { key: 'printed' as const, label: '已打印', color: '#138565' },
+  { key: 'voided' as const, label: '已作废', color: '#D64550' },
 ]
 
 const EMPTY: DistributionRow = {
@@ -150,7 +150,10 @@ onMounted(load)
 }
 .totals {
   margin-bottom: 16px;
+  background: transparent;
+  border: none;
 }
+:deep(.totals .el-card__body) { padding: 0; }
 .total-row {
   display: flex;
   align-items: baseline;
@@ -176,6 +179,10 @@ onMounted(load)
   align-items: center;
   gap: 6px;
   font-size: 13px;
+  background: #fff;
+  padding: 20px;
+  border: 1px solid var(--lms-line);
+  border-radius: 12px;
 }
 .dot {
   width: 8px;
@@ -184,6 +191,10 @@ onMounted(load)
 }
 .state-value {
   font-weight: 600;
+  font-size: 26px;
+  grid-column: 2 / 4;
+  margin: 8px 0;
+  font-variant-numeric: tabular-nums;
 }
 .bar {
   grid-column: 2 / 4;

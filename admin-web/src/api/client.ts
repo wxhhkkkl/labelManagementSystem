@@ -48,6 +48,10 @@ export async function request<T>(
 
   const payload = await resp.json().catch(() => null)
   if (!resp.ok) {
+    if (resp.status === 401 && path !== '/api/v1/auth/login') {
+      setToken(null)
+      window.dispatchEvent(new Event('lms:unauthorized'))
+    }
     const body: ApiErrorBody = payload ?? {
       error_code: 'UNKNOWN',
       message: resp.statusText,

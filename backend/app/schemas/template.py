@@ -9,11 +9,19 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, ValidationError, model_validator
 
-ElementType = Literal["qrcode", "barcode", "text", "field"]
+ElementType = Literal["qrcode", "barcode", "text", "field", "date", "serial"]
 
 ALIGNMENTS = ("left", "center", "right")
-# 契约第 4 节：动态字段只认这四个
-FIELD_NAMES = ("product_name", "company_name", "code_value", "batch_no")
+# 动态字段包括业务字段与服务端保存的首次打印日期、每日流水号。
+FIELD_NAMES = (
+    "product_name",
+    "company_name",
+    "code_value",
+    "batch_no",
+    "production_batch_no",
+    "print_date",
+    "serial_no",
+)
 
 # 纸张尺寸的合理上界（毫米）。打印机的物理极限远小于这个数，
 # 但设成硬上限能拦住"把 60 看成 6000"这类手误。
@@ -29,8 +37,8 @@ class TemplateElement(BaseModel):
     size: float | None = Field(default=None, gt=0)
     width: float | None = Field(default=None, gt=0)
     height: float | None = Field(default=None, gt=0)
-    ec_level: str | None = None
-    symbology: str | None = None
+    ec_level: Literal["L", "M", "Q", "H"] | None = None
+    symbology: Literal["code128", "code39", "ean13"] | None = None
     show_text: bool | None = None
 
     # 文本 / 动态字段
@@ -40,9 +48,30 @@ class TemplateElement(BaseModel):
     font_family: str | None = None
     bold: bool | None = None
     align: Literal["left", "center", "right"] | None = None
+    multiline: bool | None = None
+    date_source: Literal["print", "fixed"] = "print"
+    date_format: Literal["YYYY-MM-DD", "YY-MM-DD", "YYYY/MM/DD", "YYYYMMDD", "YYYY年MM月DD日"] = (
+        "YYYY-MM-DD"
+    )
+    prefix: str = Field(default="", max_length=64)
+    suffix: str = Field(default="", max_length=64)
+    serial_digits: int = Field(default=6, ge=1, le=12)
 
     @model_validator(mode="after")
     def _require_type_specific_attributes(self) -> "TemplateElement":
+        if self.field_name is not None and self.field_name not in FIELD_NAMES:
+            raise ValueError("未知的动态字段名")
+        if self.type in ("date", "serial") and self.font_size is None:
+            raise ValueError("日期或流水号元素必须提供 font_size")
+        if self.type == "date" and self.date_source == "fixed":
+            from datetime import date
+
+            try:
+                parsed = date.fromisoformat(self.content or "")
+                if parsed.isoformat() != self.content:
+                    raise ValueError("日期格式必须为 YYYY-MM-DD")
+            except ValueError as exc:
+                raise ValueError("固定日期必须为有效的 YYYY-MM-DD 日期") from exc
         if self.type == "qrcode" and self.size is None:
             raise ValueError("二维码元素必须提供 size")
         if self.type == "barcode" and (self.width is None or self.height is None):
@@ -77,9 +106,7 @@ class TemplateDoc(BaseModel):
         # 但一个元素整个落在纸外通常是坐标填错了，这里直接拦下。
         for index, el in enumerate(self.elements):
             if el.x >= self.paper_width_mm or el.y >= self.paper_height_mm:
-                raise ValueError(
-                    f"第 {index + 1} 个元素的起点 ({el.x}, {el.y}) 已在纸张之外"
-                )
+                raise ValueError(f"第 {index + 1} 个元素的起点 ({el.x}, {el.y}) 已在纸张之外")
         return self
 
 

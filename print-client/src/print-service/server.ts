@@ -40,6 +40,7 @@ export interface PrintOutcome {
 
 export interface PrintDriver {
   listPrinters(): Promise<string[]>
+  defaultPrinter?(): Promise<string | null>
   print(job: PrintJob): Promise<PrintOutcome>
 }
 
@@ -49,7 +50,7 @@ export class PrintService {
   private stopping = false
   private boundPort = DEFAULT_PORT
 
-  constructor(private readonly driver: PrintDriver) {
+  constructor(private readonly driver: PrintDriver, private readonly allowedOrigin = 'null') {
     this.token = randomBytes(24).toString('hex')
   }
 
@@ -104,6 +105,18 @@ export class PrintService {
 
   private async handle(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
     const url = req.url ?? '/'
+    res.setHeader('Access-Control-Allow-Origin', this.allowedOrigin)
+    res.setHeader('Vary', 'Origin')
+    if (req.headers.origin && req.headers.origin !== this.allowedOrigin) {
+      return send(res, 403, { error_code: 'FORBIDDEN', message: '不允许此页面访问打印服务' })
+    }
+    if (req.method === 'OPTIONS') {
+      res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Print-Token')
+      res.writeHead(204)
+      res.end()
+      return
+    }
 
     // 健康检查不需要令牌——它要被用来判断"打印服务是否在运行"
     if (req.method === 'GET' && url === '/health') {
@@ -118,6 +131,9 @@ export class PrintService {
       if (req.method === 'GET' && url === '/printers') {
         const printers = await this.driver.listPrinters()
         return send(res, 200, { printers })
+      }
+      if (req.method === 'GET' && url === '/default-printer') {
+        return send(res, 200, { printer: await this.driver.defaultPrinter?.() ?? null })
       }
 
       if (req.method === 'POST' && url === '/print') {
@@ -163,7 +179,7 @@ function send(res: http.ServerResponse, status: number, payload: unknown): void 
     'Content-Type': 'application/json; charset=utf-8',
     'Content-Length': Buffer.byteLength(body),
     // 只服务本机界面，不允许任何浏览器页面跨源读取
-    'Access-Control-Allow-Origin': 'null',
+    'Access-Control-Allow-Origin': String(res.getHeader('Access-Control-Allow-Origin') ?? 'null'),
   })
   res.end(body)
 }

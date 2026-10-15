@@ -21,9 +21,8 @@ class ImportBatch(PkMixin, TimestampMixin, Base):
     batch_no: Mapped[str] = mapped_column(String(32), nullable=False, unique=True)
     code_list_filename: Mapped[str] = mapped_column(String(255), nullable=False)
     mapping_filename: Mapped[str] = mapped_column(String(255), nullable=False)
-    status: Mapped[str] = mapped_column(
-        ImportBatchStatus, nullable=False, default="pending"
-    )
+    product_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("product.id"))
+    status: Mapped[str] = mapped_column(ImportBatchStatus, nullable=False, default="pending")
     total_rows: Mapped[int | None] = mapped_column(Integer)
     processed_rows: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     success_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)

@@ -7,6 +7,8 @@ export interface ImportBatch {
   batch_no: string
   code_list_filename: string
   mapping_filename: string
+  product_id?: number | null
+  product_names?: string[]
   status: string
   total_rows: number | null
   processed_rows: number
@@ -28,10 +30,15 @@ export const listBatches = () => request<ImportBatch[]>('/api/v1/imports')
 export const getBatch = (id: number) => request<ImportBatch>(`/api/v1/imports/${id}`)
 
 /** 上传两个文件。走 multipart，不能用 client.request 的 json 通道。 */
-export async function uploadImport(codeListFile: File, mappingFile: File): Promise<ImportCreated> {
+export async function uploadImport(
+  codeListFile: File,
+  mappingFile: File | null,
+  productId?: number,
+): Promise<ImportCreated> {
   const form = new FormData()
   form.append('code_list_file', codeListFile)
-  form.append('mapping_file', mappingFile)
+  if (mappingFile) form.append('mapping_file', mappingFile)
+  if (productId !== undefined) form.append('product_id', String(productId))
 
   const { ApiError } = await import('./client')
   const headers = new Headers()
@@ -80,7 +87,8 @@ export async function downloadFile(path: string, fallbackName: string): Promise<
   URL.revokeObjectURL(url)
 }
 
-export const downloadTemplate = () => downloadFile('/api/v1/imports/template', 'import-template.xlsx')
+export const downloadTemplate = () =>
+  downloadFile('/api/v1/imports/template', 'import-template.xlsx')
 
 export const downloadErrors = (batchId: number, batchNo: string) =>
   downloadFile(`/api/v1/imports/${batchId}/errors`, `${batchNo}-errors.csv`)

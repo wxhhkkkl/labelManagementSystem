@@ -19,13 +19,16 @@ from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.core.errors import ApiError, ErrorCode
+from app.models.allocation_order import AllocationOrder
 from app.models.base import utcnow
 from app.models.code import Code
 from app.models.code_event import CodeEvent
 from app.models.company import Company
 from app.models.print_log import PrintLog
+from app.models.template import TemplateVersion
 from app.models.workstation import Workstation
 from app.services import code_state, template_resolver
+from app.services.print_identity import business_date, lock_daily_counter, requires_identity
 
 logger = logging.getLogger(__name__)
 
@@ -114,6 +117,17 @@ def preempt(
     """
     _assert_workstation_usable(db, workstation)
 
+    print_day = business_date()
+    if code_values:
+        documents = db.scalars(
+            select(TemplateVersion.elements_json)
+            .join(AllocationOrder, AllocationOrder.template_version_id == TemplateVersion.id)
+            .join(Code, Code.current_allocation_order_id == AllocationOrder.id)
+            .where(Code.code_value.in_(code_values), Code.company_id == workstation.company_id)
+        ).all()
+        if any(requires_identity(document) for document in documents):
+            lock_daily_counter(db, print_day)
+
     accepted: list[AcceptedPrint] = []
     rejected: list[RejectedPrint] = []
     seen: set[str] = set()
@@ -141,7 +155,7 @@ def preempt(
                     raise ApiError(ErrorCode.FORBIDDEN_SCOPE, "该码不属于本公司")
 
                 target = code_state.assert_action(code.status, "print")
-                payload = template_resolver.resolve_for_code(db, code)
+                payload = template_resolver.resolve_for_code(db, code, print_day=print_day)
 
                 code.status = target
                 code.locked_at = utcnow()
@@ -234,6 +248,11 @@ def confirm(
                 else:
                     target = code_state.assert_action("printing", "fail")
                     code.status = target
+                    # 明确失败后下次首次打印重新取当天编号；已消耗的编号不回收。
+                    from app.models.print_identity import PrintIdentity
+                    identity = db.get(PrintIdentity, code.id)
+                    if identity is not None and code.print_count == 0:
+                        db.delete(identity)
                     # 失败回退不是补打，reprint_count 保持不动（FR-046）
                     event_type = "print_failed"
                     result = "failed"

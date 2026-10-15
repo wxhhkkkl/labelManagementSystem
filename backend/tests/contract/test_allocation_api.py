@@ -167,9 +167,7 @@ class TestListAllocations:
         _alloc(client, hq_admin, company_id=hq_company.id, product_id=product.id, quantity=1)
         _alloc(client, hq_admin, company_id=other_company.id, product_id=product.id, quantity=1)
 
-        body = client.get("/api/v1/allocations", headers=auth_header(sub_admin)).json()
-        assert body, "本公司应至少有一条"
-        assert all(o["company_id"] == hq_company.id for o in body)
+        assert client.get("/api/v1/allocations", headers=auth_header(sub_admin)).status_code == 403
 
     def test_sub_admin_cannot_query_other_company(
         self, client, sub_admin, other_company
