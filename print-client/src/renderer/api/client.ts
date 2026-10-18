@@ -66,10 +66,18 @@ export async function request<T>(
   if (token) headers.set('Authorization', `Bearer ${token}`)
   if (json !== undefined) headers.set('Content-Type', 'application/json')
 
-  const resp = await fetch(path, {
+  const body = json !== undefined ? JSON.stringify(json) : init.body
+  const bridge = window.lmsBridge
+  const remote = bridge?.apiRequest ? await bridge.apiRequest({
+    path, method: (init.method ?? 'GET').toUpperCase(), headers: Object.fromEntries(headers),
+    body: typeof body === 'string' ? body : undefined,
+  }) : null
+  const resp = remote ? new Response(remote.status === 204 ? null : remote.body, {
+    status: remote.status, statusText: remote.statusText,
+  }) : await fetch(path, {
     ...init,
     headers,
-    body: json !== undefined ? JSON.stringify(json) : init.body,
+    body,
   })
 
   if (resp.status === 204) return undefined as T

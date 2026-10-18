@@ -6,9 +6,11 @@
  */
 
 import type { TemplateDoc } from '../../print-render/renderer'
+import type { ServiceRequest, ServiceResponse } from '../../serviceConfig'
 import { renderToString } from '../../print-render/renderer'
 
 interface Bridge {
+  apiRequest?: (request: ServiceRequest) => Promise<ServiceResponse>
   machineId: string
   printServicePort: number
   printServiceToken: string

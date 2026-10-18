@@ -1,14 +1,19 @@
+import type { TemplatePreview } from '../api/print'
 import type { TemplateDoc } from '../../print-render/renderer'
 
-/** 独立测试标签，不调用业务码预占或确认接口。 */
-export function testLabel(now: Date): {doc:TemplateDoc;data:Record<string,string>} {
+/** 原样使用当前版式和尺寸，只替换演示数据；不预占业务码或申请流水号。 */
+export function testLabel(template:TemplatePreview,now:Date):{doc:TemplateDoc;data:Record<string,string>} {
+  const date = new Intl.DateTimeFormat('en-CA',{
+    timeZone:'Asia/Shanghai',year:'numeric',month:'2-digit',day:'2-digit',
+  }).format(now)
   return {
-    doc:{paper_width_mm:40,paper_height_mm:55,elements:[
-      {type:'text',x:3,y:3,width:34,height:6,font_size:4,bold:true,align:'center',content:'测试打印'},
-      {type:'qrcode',x:9,y:12,size:22,field_name:'test_code'},
-      {type:'text',x:3,y:37,width:34,height:5,font_size:2.5,align:'center',content:'仅供打印测试'},
-      {type:'field',x:2,y:44,width:36,height:4,font_size:2,align:'center',field_name:'test_time'},
-    ]},
-    data:{test_code:`LMS-TEST-${now.getTime()}`,test_time:now.toLocaleString('zh-CN',{hour12:false})},
+    doc:JSON.parse(JSON.stringify(template.elements_json)) as TemplateDoc,
+    data:{
+      ...template.data,
+      code_value:'0000000000000',
+      production_batch_no:'TEST-ONLY',batch_no:'TEST-ONLY',
+      product_name:'测试产品',company_name:'测试打印',
+      print_date:date,serial_no:'0',
+    },
   }
 }

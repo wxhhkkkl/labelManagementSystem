@@ -60,7 +60,7 @@ try {
     Remove-Item Env:ELECTRON_RUN_AS_NODE -ErrorAction SilentlyContinue
     Remove-Item Env:REMOTE_DEBUGGING_PORT -ErrorAction SilentlyContinue
 
-    if (-not (Test-Http 'http://127.0.0.1:8000/openapi.json')) {
+    if (($Target -in @('all', 'admin')) -and -not (Test-Http 'http://127.0.0.1:8000/openapi.json')) {
         Write-Warning 'Backend is offline (port 8000). Start the backend before logging in.'
     }
 

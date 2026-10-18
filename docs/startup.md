@@ -19,4 +19,6 @@
 
 前提：已安装 Node.js，并在 `admin-web` 和 `print-client` 安装依赖。脚本支持通过 PATH 中的 fnm 初始化 Node。Electron 缺少运行文件时，按错误提示执行安装命令。
 
-后端需另外运行在 8000 端口；未运行时脚本会提示，界面仍可启动，登录和业务操作需要后端可用。
+管理网页在本地开发时仍需另外运行 8000 端口的后端。
+
+工位打印端默认连接已部署服务 `https://lms.yuwangchenfa.com`，不依赖本机 8000 端口。地址统一维护在 `print-client/src/serviceConfig.ts`。Electron 安装版与开发版的业务请求均通过受限主进程接口访问该 HTTPS 服务；浏览器单独预览开发页面时，Vite 也将 `/api/v1/` 代理到同一服务器。标签出纸仍通过本机 17650 打印服务完成。

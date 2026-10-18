@@ -3,6 +3,13 @@
 import type { TemplateDoc } from '../../print-render/renderer'
 import { request } from './client'
 
+export interface TemplatePreview {
+  name: string
+  version_no: number
+  elements_json: TemplateDoc
+  data: Record<string, string>
+}
+
 export interface PrintableCode {
   code_value: string
   product_id: number

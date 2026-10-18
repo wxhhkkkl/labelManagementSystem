@@ -10,14 +10,14 @@
       <button v-if="user" class="logout-button" @click="logout">退出登录</button>
     </header>
       <nav class="station-tabs" aria-label="工位导航">
-        <button :class="{ active: tab === 'print' }" @click="tab = 'print'">{{ workstationId ? '工位打印' : '操作员登录' }}</button>
+        <button :class="{ active: tab === 'print' }" @click="showPrint">{{ workstationId ? '工位打印' : '操作员登录' }}</button>
         <button v-if="workstationId" :class="{ active: tab === 'settings' }" @click="tab = 'settings'">工位状态</button>
         <button :class="{ active: tab === 'drivers' }" @click="tab = 'drivers'">打印机驱动安装</button>
       </nav>
     <BindWorkstationView v-if="!workstationId && tab !== 'drivers'" :session-user="user" @bound="onBound" />
       <main v-if="workstationId || tab === 'drivers'" class="station-content">
-        <PrintView v-if="workstationId" v-show="tab === 'print'" />
-        <SettingsView v-if="tab === 'settings' && workstationId" :workstation-id="workstationId" />
+        <PrintView v-if="workstationId" v-show="tab === 'print'" ref="printView" @template-change="currentTemplate = $event" />
+        <SettingsView v-if="tab === 'settings' && workstationId" :workstation-id="workstationId" :current-template="currentTemplate" />
         <DriverInstallView v-if="tab === 'drivers'" :bound="!!workstationId" @settings="tab = workstationId ? 'settings' : 'print'" />
         <footer class="app-footer"><span>标签管理系统 · 工位打印端</span><span>模板由后台统一配置</span></footer>
       </main>
@@ -27,6 +27,7 @@
 import { onMounted, onUnmounted, ref } from 'vue'
 import { setToken } from './api/client'
 import type { MeUser, BindResponse } from './api/workstation'
+import type { TemplatePreview } from './api/print'
 import BindWorkstationView from './views/BindWorkstationView.vue'
 import PrintView from './views/PrintView.vue'
 import SettingsView from './views/SettingsView.vue'
@@ -39,19 +40,27 @@ const user = ref<MeUser | null>(null)
 const boundName = ref('')
 const workstationId = ref<number | null>(null)
 const tab = ref<'print' | 'settings' | 'drivers'>('print')
+const printView = ref<InstanceType<typeof PrintView> | null>(null)
+const currentTemplate = ref<TemplatePreview | null>(null)
+function showPrint(): void {
+  tab.value = 'print'
+  void printView.value?.refresh()
+}
 function onBound(id: number, profile: MeUser, station: BindResponse): void {
+  currentTemplate.value = null
   workstationId.value = id
   user.value = profile
   boundName.value = station.name
 }
 function logout(): void {
+  currentTemplate.value = null
   setToken(null)
   user.value = null
   workstationId.value = null
   boundName.value = ''
   tab.value = 'print'
 }
-function bindingInvalid(): void { workstationId.value = null; boundName.value = ''; tab.value = 'print' }
+function bindingInvalid(): void { currentTemplate.value = null; workstationId.value = null; boundName.value = ''; tab.value = 'print' }
 onMounted(() => window.addEventListener('lms:binding-invalid', bindingInvalid))
 onUnmounted(() => window.removeEventListener('lms:binding-invalid', bindingInvalid))
 </script>

@@ -29,7 +29,7 @@
       <div class="print-results">
         <section class="station-panel">
           <h2>本次任务</h2>
-          <el-table v-if="task.length" :data="task" size="small" height="140"><el-table-column prop="code_value" label="码值" min-width="200" /><el-table-column label="结果" width="140"><template #default="{ row }"><el-tag :type="tagType(row)" size="small">{{ tagLabel(row) }}</el-tag></template></el-table-column><el-table-column label="说明" min-width="160"><template #default="{ row }">{{ row.message ?? '—' }}</template></el-table-column></el-table>
+          <el-table v-if="task.length" :data="task" size="small" height="100%"><el-table-column prop="code_value" label="码值" min-width="200" /><el-table-column label="结果" width="140"><template #default="{ row }"><el-tag :type="tagType(row)" size="small">{{ tagLabel(row) }}</el-tag></template></el-table-column><el-table-column label="说明" min-width="160"><template #default="{ row }">{{ row.message ?? '—' }}</template></el-table-column></el-table>
           <el-empty v-else :image-size="40" description="尚未发起打印" />
           <div v-if="hasLocked" class="failure-action"><el-button type="warning" :loading="confirming" @click="doConfirmFailed">标记失败并回退</el-button></div>
         </section>
@@ -40,7 +40,7 @@
 </template>
 <script setup lang="ts">
 import { ElMessage } from 'element-plus'
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 
 import { ApiError, getBoundWorkstationId, getBoundPrinter, setBoundPrinter, request } from '../api/client'
 import { getMachineBinding, setWorkstationPrinter } from '../api/workstation'
@@ -50,13 +50,15 @@ import {
   startPrint,
   type AcceptedPrint,
   type PrintableCode,
+  type TemplatePreview as TemplatePreviewData,
 } from '../api/print'
 import { isPrintServiceAlive, getDefaultPrinter, listPrinters, print } from '../api/print-service'
 import { useHeartbeat } from '../composables/useHeartbeat'
 import TaskView from './TaskView.vue'
 import TemplatePreview from '../components/TemplatePreview.vue'
-import type { TemplateDoc } from '../../print-render/renderer'
-const preview = ref<{name:string; version_no:number; elements_json:TemplateDoc; data:Record<string,string>} | null>(null)
+const preview = ref<TemplatePreviewData | null>(null)
+const emit = defineEmits<{ 'template-change': [template: TemplatePreviewData | null] }>()
+watch(preview, value => emit('template-change', value))
 
 interface TaskRow {
   code_value: string
@@ -253,6 +255,13 @@ async function doConfirmFailed(): Promise<void> {
 }
 
 let poll: ReturnType<typeof setInterval> | null = null
+
+async function refresh(): Promise<void> {
+  // 打印与结果确认期间保留正在处理的码，完成后原流程会刷新。
+  if (printing.value || confirming.value) return
+  await Promise.all([refreshServiceStatus(), loadCodes()])
+}
+defineExpose({ refresh })
 
 // 心跳必须持续上报：服务端靠它判断本工位是否在线，
 // 停发超过 30 秒后对该工位的补打就会被拒绝（FR-056）

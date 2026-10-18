@@ -10,7 +10,7 @@
 
     <el-empty v-if="!queue.length" description="暂无补打任务" :image-size="40" />
 
-    <el-table v-else :data="queue" height="150" border size="small">
+    <el-table v-else :data="queue" height="100%" border size="small">
       <el-table-column prop="code_value" label="码值" width="220" />
       <el-table-column prop="product_name" label="产品" />
       <el-table-column prop="reason" label="补打原因" />
@@ -122,7 +122,7 @@ defineExpose({ hasTasks, refresh: poll })
 
 <style scoped>
 .tasks {
-  margin-top: 24px;
+  margin-top: 0;
 }
 .head {
   display: flex;

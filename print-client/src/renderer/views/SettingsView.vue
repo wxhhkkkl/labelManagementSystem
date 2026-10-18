@@ -5,6 +5,7 @@
     <el-descriptions :column="1" border class="service-details">
       <el-descriptions-item label="当前工位">{{ stationName || '—' }}</el-descriptions-item>
       <el-descriptions-item label="当前打印机">{{ saved || '尚未选择' }}</el-descriptions-item>
+      <el-descriptions-item label="测试模板">{{ currentTemplate ? `${currentTemplate.name} · V${currentTemplate.version_no}（${currentTemplate.elements_json.paper_width_mm} × ${currentTemplate.elements_json.paper_height_mm} mm）` : '请先在工位打印页选择产品并加载当前模板' }}</el-descriptions-item>
     </el-descriptions>
     <label class="field-label">选择打印机</label>
     <div class="printer-choice">
@@ -15,8 +16,8 @@
     </div>
     <p class="hint">选择后自动保存，下次打开继续使用。</p>
     <el-alert v-if="saved && serviceOk && !printers.includes(saved)" title="已保存的打印机当前不可用，请重新选择或检查连接。" type="warning" :closable="false" />
-    <el-button type="primary" :loading="testing" :disabled="!serviceOk || !saved || !printers.includes(saved) || saving" @click="testPrint">测试打印一张</el-button>
-    <p class="hint">使用 40 × 55 mm 测试标签，仅打印独立测试二维码，不占用业务码。</p>
+    <el-button type="primary" :loading="testing" :disabled="!serviceOk || !saved || !printers.includes(saved) || saving || !currentTemplate" @click="testPrint">测试打印一张</el-button>
+    <p class="hint">按工位打印页的当前模板及纸张尺寸测试一张，码值为 0000000000000、批号为 TEST-ONLY。不占用业务码或流水号，测试标签请勿用于生产。</p>
   </section>
 </template>
 <script setup lang="ts">
@@ -26,7 +27,8 @@ import { isPrintServiceAlive, getDefaultPrinter, listPrinters, print } from '../
 import { getMachineBinding, setWorkstationPrinter } from '../api/workstation'
 import { getBoundPrinter, setBoundPrinter } from '../api/client'
 import { testLabel } from '../utils/testLabel'
-const props = defineProps<{workstationId:number}>()
+import type { TemplatePreview } from '../api/print'
+const props = defineProps<{workstationId:number;currentTemplate:TemplatePreview|null}>()
 const serviceOk=ref(false), stationName=ref(''), loading=ref(false), saving=ref(false), testing=ref(false)
 const printers=ref<string[]>([]), saved=ref(getBoundPrinter() ?? ''), selection=ref(saved.value)
 async function save():Promise<void> {
@@ -54,9 +56,10 @@ async function refresh():Promise<void> {
   finally {loading.value=false}
 }
 async function testPrint():Promise<void> {
+  if (!props.currentTemplate) { ElMessage.warning('请先在工位打印页选择产品并加载当前模板'); return }
   testing.value=true
   try {
-    const result=await print({...testLabel(new Date()),deviceName:saved.value})
+    const result=await print({...testLabel(props.currentTemplate,new Date()),deviceName:saved.value})
     if(!result.ok) throw new Error(result.error ?? '测试打印失败')
     ElMessage.success('已发送一张测试标签')
   } catch(e) {ElMessage.error(e instanceof Error ? e.message : '测试打印失败')}

@@ -9,7 +9,9 @@
  * 启动顺序有讲究：打印服务必须先于窗口就绪，否则界面一打开就显示"打印服务未启动"。
  */
 
-import { app, BrowserWindow, shell } from 'electron'
+import { app, BrowserWindow, shell, ipcMain, net } from 'electron'
+import { requestService } from './serviceRequest'
+import type { ServiceRequest } from '../serviceConfig'
 import { isPrinterSupportUrl } from '../printerSupport'
 import { join } from 'node:path'
 import { loadMachineIdentity } from './machineIdentity'
@@ -58,6 +60,12 @@ function createWindow(): BrowserWindow {
 }
 
 void app.whenReady().then(async () => {
+  ipcMain.handle('lms:service-request', (event, request: ServiceRequest) => {
+    if (event.sender !== mainWindow?.webContents || event.senderFrame !== mainWindow.webContents.mainFrame) {
+      throw new Error('无权访问业务服务')
+    }
+    return requestService(request, net.fetch.bind(net))
+  })
   if (process.platform === 'win32') app.setAppUserModelId('com.labelmgmt.print-client')
   const machineId = loadMachineIdentity(app.getPath('appData'), app.getPath('userData'))
   process.env.LMS_MACHINE_ID = machineId
