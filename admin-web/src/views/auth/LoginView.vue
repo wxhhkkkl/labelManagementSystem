@@ -3,6 +3,10 @@
     <section class="login-story">
       <div class="brand"><span class="brand-mark">L</span><div>标签管理系统<small>LABEL MANAGEMENT</small></div></div>
       <div class="login-copy"><span class="login-kicker">让每一个码都有迹可循</span><h1>统一管理标签<br>连接每一次打印</h1><p>从码导入、公司分配到工位打印，<br>在一个工作空间内完成管理与追溯。</p><div class="workflow"><span>码导入</span><span>→</span><span>码分配</span><span>→</span><span>工位打印</span></div></div>
+      <a class="print-download" :href="PRINT_CLIENT_DOWNLOAD_URL" target="_blank" rel="noopener noreferrer">
+        <span><strong>点击软件下载</strong><small>工位打印端 Windows 安装包</small></span>
+        <span aria-hidden="true">↓</span>
+      </a>
       <p class="story-footer">标签管理 · 工位协同 · 全程追溯</p>
     </section>
     <section class="login-form-area">
@@ -32,6 +36,9 @@ import { ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { login } from '../../api/auth'
 import { ApiError, setToken } from '../../api/client'
+
+const PRINT_CLIENT_DOWNLOAD_URL =
+  'https://maxlabelmall.oss-cn-wulanchabu.aliyuncs.com/lms/release/LMS-Print-Setup-0.1.0.exe'
 
 const route = useRoute()
 const router = useRouter()
@@ -73,7 +80,12 @@ async function submit() {
 h1 { font-size:clamp(28px,3.1vw,44px); line-height:1.5; letter-spacing:-1px; margin:24px 0 18px; }
 .login-copy p { color:#cbddff; font-size:14px; line-height:1.9; }
 .workflow { display:flex; flex-wrap:wrap; gap:16px; margin-top:36px; font-size:13px; }
-.story-footer { color:#b9d0ff; font-size:11px; }
+.print-download { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-top:28px; padding:14px 16px; border:1px solid #ffffff33; border-radius:10px; background:#ffffff12; color:#fff; text-decoration:none; transition:background .15s; }
+.print-download:hover { background:#ffffff20; }
+.print-download span:first-child { display:flex; flex-direction:column; gap:3px; }
+.print-download strong { font-size:14px; font-weight:600; }
+.print-download small { color:#cbddff; font-size:11px; }
+.story-footer { color:#b9d0ff; font-size:11px; margin-top:16px; }
 .login-form-area { flex:1; min-width:0; display:flex; flex-direction:column; padding:44px; }
 .login-card { width:100%; max-width:360px; margin:auto; padding:40px 0; }
 .login-badge { display:inline-block; background:var(--lms-soft); color:var(--lms-blue); padding:5px 10px; border-radius:6px; font-size:12px; }
