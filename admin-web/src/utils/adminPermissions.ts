@@ -1,5 +1,6 @@
 export const SUB_ADMIN_PATHS = new Set([
   '/help',
+  '/dashboard',
   '/workstations',
   '/users',
   '/code-pool',

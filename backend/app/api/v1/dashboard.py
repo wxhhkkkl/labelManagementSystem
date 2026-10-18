@@ -12,7 +12,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.core.db import get_db
-from app.core.deps import HqAdmin
+from app.core.deps import AnyAdmin
 from app.core.scope import Scope
 from app.services import reports
 
@@ -86,7 +86,7 @@ def _aggregate(rows: list[reports.DashboardRow], group_by: str) -> list[Distribu
 
 @router.get("/code-distribution", response_model=DistributionOut)
 def code_distribution(
-    user: HqAdmin,
+    user: AnyAdmin,
     db: DbSession,
     group_by: GroupBy = "company_product",
     created_from: datetime | None = None,
@@ -94,6 +94,7 @@ def code_distribution(
 ) -> DistributionOut:
     """四态码量分布（FR-065）。
 
+    总部可看全部；子公司管理员只看本公司（由 Scope 强制过滤）。
     时间筛选的口径是**码入库时间**，不是"历史某时刻的分布"——
     四态本身是当前快照，不存在历史版本。这一点在参数说明里也写明。
     """

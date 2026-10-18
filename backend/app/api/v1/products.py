@@ -88,6 +88,7 @@ def create_product(payload: ProductCreate, user: HqAdmin, db: DbSession, ip: Cli
     return _serialize(product, _stats_for(db, product.id))
 
 
+@router.put("/{product_id}", response_model=ProductOut)
 @router.patch("/{product_id}", response_model=ProductOut)
 def update_product(
     product_id: int, payload: ProductUpdate, user: HqAdmin, db: DbSession, ip: ClientIp

@@ -140,8 +140,7 @@ def void_codes(payload: VoidRequest, user: HqAdmin, db: DbSession, ip: ClientIp)
 def get_code_detail(code_value: str, user: HqAdmin, db: DbSession) -> CodeDetailOut:
     """码详情与全生命周期时间线（FR-064）。
 
-    可见范围按**数据归属**判定，与审计日志（仅总部可查）不同：
-    子公司管理员与工位操作员都能查本公司的码。
+    仅总部管理员可查；子公司与工位端不提供追溯入口。
     """
     code = code_timeline.get_code(db, code_value)
     scope = Scope(user)

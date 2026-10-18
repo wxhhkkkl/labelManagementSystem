@@ -27,6 +27,8 @@ export interface TemplateElement {
   type: string
   x: number
   y: number
+  /** 顺时针旋转角度；x/y 是旋转后外接框的左上角。 */
+  rotate?: number
   size?: number
   width?: number
   height?: number
@@ -84,23 +86,29 @@ export function elementSizeMm(el: TemplateElement): { width: number; height: num
   }
 }
 
+/** 旋转后占用的外接框尺寸；90/270 时宽高互换。 */
+export function elementBoundsMm(el: TemplateElement): { width: number; height: number } {
+  const { width, height } = elementSizeMm(el)
+  const angle = ((el.rotate ?? 0) % 360 + 360) % 360
+  return angle === 90 || angle === 270
+    ? { width: height, height: width }
+    : { width, height }
+}
+
 export interface ClippedElement {
   element: TemplateElement
   clipped: boolean
 }
 
 export function clipToPaper(el: TemplateElement, doc: TemplateDoc): ClippedElement {
-  const { width, height } = elementSizeMm(el)
+  const { width, height } = elementBoundsMm(el)
   const maxX = doc.paper_width_mm
   const maxY = doc.paper_height_mm
 
   const x = Math.max(0, Math.min(el.x, maxX))
   const y = Math.max(0, Math.min(el.y, maxY))
-  const w = Math.max(0, Math.min(width, maxX - x))
-  const h = Math.max(0, Math.min(height, maxY - y))
-
-  const clipped = x !== el.x || y !== el.y || w !== width || h !== height
-  return { element: { ...el, x, y, width: w, height: h }, clipped }
+  const clipped = x !== el.x || y !== el.y || x + width > maxX || y + height > maxY
+  return { element: { ...el, x, y }, clipped }
 }
 
 export function resolveFieldValue(fieldName: string, data: Record<string, string>): string {
@@ -112,20 +120,39 @@ export function fontFamilyChain(family?: string): string {
   return [family, ...FONT_FALLBACK].filter(Boolean).join(', ')
 }
 
+/** 元素外接框的定位样式（单位 mm）。 */
 export function elementStyle(el: TemplateElement): Record<string, string> {
   assertKnownType(el.type)
-  const { width, height } = elementSizeMm(el)
-
-  const style: Record<string, string> = {
+  const { width, height } = elementBoundsMm(el)
+  return {
     position: 'absolute',
     left: `${el.x}mm`,
     top: `${el.y}mm`,
     width: `${width}mm`,
     height: `${height}mm`,
-    textAlign: el.align ?? 'left',
     overflow: 'hidden',
     boxSizing: 'border-box',
   }
+}
+
+/** 外接框内的内容样式：按未旋转尺寸居中，再绕中心旋转。 */
+export function elementContentStyle(el: TemplateElement): Record<string, string> {
+  assertKnownType(el.type)
+  const bounds = elementBoundsMm(el)
+  const { width, height } = elementSizeMm(el)
+  const angle = el.rotate ?? 0
+  const style: Record<string, string> = {
+    position: 'absolute',
+    left: `${(bounds.width - width) / 2}mm`,
+    top: `${(bounds.height - height) / 2}mm`,
+    width: `${width}mm`,
+    height: `${height}mm`,
+    textAlign: el.align ?? 'left',
+    overflow: 'hidden',
+    boxSizing: 'border-box',
+    transformOrigin: 'center center',
+  }
+  if (angle) style.transform = `rotate(${angle}deg)`
 
   if (['text', 'field', 'date', 'serial'].includes(el.type)) {
     style.fontSize = `${el.font_size ?? 0}mm`
@@ -141,6 +168,7 @@ export function elementStyle(el: TemplateElement): Record<string, string> {
 export interface RenderedElement {
   element: TemplateElement
   style: Record<string, string>
+  contentStyle: Record<string, string>
   text: string | null
 }
 
@@ -148,7 +176,12 @@ export function renderTemplate(doc: TemplateDoc, data: Record<string, string>): 
   return doc.elements.map((original) => {
     const { element } = clipToPaper(original, doc)
     const text = ['qrcode', 'barcode'].includes(element.type) ? null : elementText(element, data)
-    return { element, style: elementStyle(original), text }
+    return {
+      element,
+      style: elementStyle(original),
+      contentStyle: elementContentStyle(original),
+      text,
+    }
   })
 }
 
@@ -252,14 +285,16 @@ export function renderToString(doc: TemplateDoc, data: Record<string, string>): 
     }
   }
   const body = renderTemplate(doc, data)
-    .map(({ element, style, text }) => {
-      const css = Object.entries(style)
-        .map(([k, v]) => `${k.replace(/[A-Z]/g, (m) => `-${m.toLowerCase()}`)}:${v}`)
-        .join(';')
-      if (element.type === 'qrcode' || element.type === 'barcode') {
-        return `<div class="el ${element.type}" style="${escapeHtml(css)}"><img alt="" src="${escapeHtml(graphicDataUrl(element, data))}" style="width:100%;height:100%;object-fit:fill" /></div>`
-      }
-      return `<div class="el" style="${escapeHtml(css)}">${escapeHtml(text ?? '')}</div>`
+    .map(({ element, style, contentStyle, text }) => {
+      const css = (values: Record<string, string>) =>
+        Object.entries(values)
+          .map(([k, v]) => `${k.replace(/[A-Z]/g, (m) => `-${m.toLowerCase()}`)}:${v}`)
+          .join(';')
+      const inner =
+        element.type === 'qrcode' || element.type === 'barcode'
+          ? `<img alt="" src="${escapeHtml(graphicDataUrl(element, data))}" style="width:100%;height:100%;object-fit:fill" />`
+          : escapeHtml(text ?? '')
+      return `<div class="el-wrap ${element.type}" style="${escapeHtml(css(style))}"><div class="el" style="${escapeHtml(css(contentStyle))}">${inner}</div></div>`
     })
     .join('')
 

@@ -53,7 +53,7 @@ class TestWriteIsolation:
     def test_cannot_edit_foreign_workstation(
         self, client, sub_admin: User, foreign_workstation
     ):
-        resp = client.patch(
+        resp = client.put(
             f"/api/v1/workstations/{foreign_workstation.id}",
             headers=auth_header(sub_admin),
             json={"name": "越权改名"},
@@ -86,7 +86,7 @@ class TestWriteIsolation:
         self, client, db: Session, sub_admin: User, other_company
     ):
         other_op = make_user(db, username="op-other3", role="operator", company=other_company)
-        resp = client.patch(
+        resp = client.put(
             f"/api/v1/users/{other_op.id}",
             headers=auth_header(sub_admin),
             json={"display_name": "越权改名"},

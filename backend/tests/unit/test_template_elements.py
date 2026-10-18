@@ -44,6 +44,21 @@ def test_invalid_serial_configuration_is_rejected(patch):
         TemplateElement.model_validate({"type": "serial", "x": 0, "y": 0, "font_size": 3, **patch})
 
 
+@pytest.mark.parametrize("angle", [0, 90, 180, 270])
+def test_rotation_is_preserved(angle):
+    doc = to_document(
+        60,
+        40,
+        [{"type": "text", "x": 1, "y": 2, "content": "x", "font_size": 3, "rotate": angle}],
+    )
+    assert doc["elements"][0]["rotate"] == angle
+
+
+def test_invalid_rotation_is_rejected():
+    with pytest.raises(ValidationError):
+        TemplateElement(type="text", x=0, y=0, content="x", font_size=3, rotate=45)
+
+
 def test_invalid_fixed_date_is_rejected():
     with pytest.raises(ValidationError):
         TemplateElement(

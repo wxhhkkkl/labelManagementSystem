@@ -5,7 +5,12 @@
  * 编辑器允许摆出的坐标，MUST 是渲染器接得住的范围。
  */
 
-import { elementSizeMm, graphicSvg, type TemplateDoc, type TemplateElement } from './templateRender'
+import {
+  elementBoundsMm,
+  graphicSvg,
+  type TemplateDoc,
+  type TemplateElement,
+} from './templateRender'
 
 export const CREATABLE_TYPES = ['qrcode', 'barcode', 'text', 'field', 'date', 'serial'] as const
 
@@ -51,7 +56,7 @@ export function typeLabel(type: string): string {
  * 用户看到的就是最终印出来的位置。
  */
 export function clampElement(el: TemplateElement, doc: TemplateDoc): TemplateElement {
-  const { width, height } = elementSizeMm(el)
+  const { width, height } = elementBoundsMm(el)
   const x = Math.max(0, Math.min(el.x, Math.max(0, doc.paper_width_mm - width)))
   const y = Math.max(0, Math.min(el.y, Math.max(0, doc.paper_height_mm - height)))
   return { ...el, x: round2(x), y: round2(y) }
@@ -87,6 +92,32 @@ export function addElement(doc: TemplateDoc, type: string): TemplateDoc {
 export function removeElement(doc: TemplateDoc, index: number): TemplateDoc {
   if (index < 0 || index >= doc.elements.length) return doc
   return { ...doc, elements: doc.elements.filter((_, i) => i !== index) }
+}
+
+/** 旋转元素：外接框中心保持不动，再夹回纸张内。 */
+export function rotateElement(doc: TemplateDoc, index: number, angle: number): TemplateDoc {
+  if (index < 0 || index >= doc.elements.length) return doc
+  const el = doc.elements[index]
+  const oldBounds = elementBoundsMm(el)
+  const cx = el.x + oldBounds.width / 2
+  const cy = el.y + oldBounds.height / 2
+  const rotated = { ...el, rotate: ((angle % 360) + 360) % 360 }
+  const bounds = elementBoundsMm(rotated)
+  return {
+    ...doc,
+    elements: doc.elements.map((item, i) =>
+      i === index
+        ? clampElement(
+            {
+              ...rotated,
+              x: round2(cx - bounds.width / 2),
+              y: round2(cy - bounds.height / 2),
+            },
+            doc,
+          )
+        : item,
+    ),
+  }
 }
 
 export function updateElement(
@@ -151,7 +182,10 @@ export function validateDocument(doc: TemplateDoc): string[] {
     if (el.x >= doc.paper_width_mm || el.y >= doc.paper_height_mm) {
       problems.push(`${label}：起点已在纸张之外`)
     }
-    const size = elementSizeMm(el)
+    if (![0, 90, 180, 270].includes(el.rotate ?? 0)) {
+      problems.push(`${label}：旋转角度只能是 0/90/180/270`)
+    }
+    const size = elementBoundsMm(el)
     if (![el.x, el.y, size.width, size.height].every(Number.isFinite))
       problems.push(`${label}：位置和尺寸必须为有效数字`)
     if (!(size.width > 0) || !(size.height > 0)) problems.push(`${label}：宽度和高度必须大于 0`)

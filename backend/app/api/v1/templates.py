@@ -1,6 +1,7 @@
 """模板接口（FR-032 ~ FR-038，契约：contracts/admin-api.md 打印模板小节）。
 
-写操作仅总部管理员；子公司与工位端只读（FR-036：子公司 MUST NOT 修改模板内容）。
+读、写操作均仅总部管理员可用（FR-036：子公司 MUST NOT 修改模板内容）。
+工位端从打印载荷获取模板内容，不直接访问本接口。
 """
 
 from typing import Annotated
@@ -39,7 +40,7 @@ def _version_out(version: TemplateVersion) -> TemplateVersionOut:
 
 @router.get("", response_model=list[TemplateOut])
 def list_templates(user: HqAdmin, db: DbSession) -> list[TemplateOut]:
-    """模板列表。子公司也可见——他们需要知道自己被分配的是哪套模板。"""
+    """模板列表。仅总部可查；子公司通过分配单获知所用模板版本。"""
     rows = template_service.list_templates(db)
     return [
         TemplateOut(
@@ -85,6 +86,7 @@ def list_versions(template_id: int, user: HqAdmin, db: DbSession):
     return [_version_out(v) for v in template_service.list_versions(db, template_id)]
 
 
+@router.put("/{template_id}", response_model=TemplateVersionOut)
 @router.patch("/{template_id}", response_model=TemplateVersionOut)
 def update_template(
     template_id: int, payload: TemplateUpdate, user: HqAdmin, db: DbSession, ip: ClientIp

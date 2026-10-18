@@ -277,7 +277,7 @@ description: "打印管理系统实施任务清单"
 ### 测试（先写，运行至失败）
 
 - [X] T117 [P] [US6] 集成测试：版本冻结 `backend/tests/integration/test_template_freeze.py` —— 修改 `frozen=true` 的版本返回 `TEMPLATE_VERSION_FROZEN`；模板停用不影响已冻结版本继续用于打印（FR-034）—— 先写并运行至失败
-- [X] T118 [P] [US6] 集成测试：子公司只读 `backend/tests/integration/test_template_readonly.py` —— 子公司管理员或工位操作员尝试修改模板返回 `FORBIDDEN_SCOPE`（FR-036）—— 先写并运行至失败
+- [X] T118 [P] [US6] 集成测试：模板访问控制 `backend/tests/integration/test_template_readonly.py` —— 模板读写接口仅总部可访问，子公司管理员或工位操作员请求返回 `FORBIDDEN_SCOPE`（FR-036）—— 先写并运行至失败
 - [X] T119 [P] [US6] 契约测试：模板接口 `backend/tests/contract/test_template_api.py` —— 先写并运行至失败
 - [X] T120 [P] [US6] 前端单元测试：模板编辑器坐标与拖拽 `admin-web/tests/unit/template-editor.spec.ts` —— 先写并运行至失败
 

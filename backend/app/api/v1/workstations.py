@@ -65,6 +65,7 @@ def create_workstation(payload: WorkstationCreate, user: AnyAdmin, db: DbSession
     return serialize(db, ws)
 
 
+@router.put("/{workstation_id}", response_model=WorkstationOut)
 @router.patch("/{workstation_id}", response_model=WorkstationOut)
 def update_workstation(
     workstation_id: int,

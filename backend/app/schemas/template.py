@@ -32,6 +32,8 @@ class TemplateElement(BaseModel):
     type: ElementType
     x: float = Field(ge=0)
     y: float = Field(ge=0)
+    # 顺时针旋转角度。x/y 始终是旋转后外接框的左上角。
+    rotate: Literal[0, 90, 180, 270] = 0
 
     # 图形元素
     size: float | None = Field(default=None, gt=0)

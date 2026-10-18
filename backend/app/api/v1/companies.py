@@ -37,6 +37,7 @@ def create_company(payload: CompanyCreate, user: HqAdmin, db: DbSession, ip: Cli
     return company
 
 
+@router.put("/{company_id}", response_model=CompanyOut)
 @router.patch("/{company_id}", response_model=CompanyOut)
 def update_company(
     company_id: int, payload: CompanyUpdate, user: HqAdmin, db: DbSession, ip: ClientIp

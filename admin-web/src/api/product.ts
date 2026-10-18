@@ -28,7 +28,7 @@ export const createProduct = (json: Record<string, unknown>) =>
   request<Product>('/api/v1/products', { method: 'POST', json })
 
 export const updateProduct = (id: number, json: Record<string, unknown>) =>
-  request<Product>(`/api/v1/products/${id}`, { method: 'PATCH', json })
+  request<Product>(`/api/v1/products/${id}`, { method: 'PUT', json })
 
 export const disableProduct = (id: number) =>
   request<Product>(`/api/v1/products/${id}/disable`, { method: 'POST' })

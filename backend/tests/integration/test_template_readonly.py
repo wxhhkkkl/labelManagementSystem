@@ -1,7 +1,7 @@
-"""T118：模板对子公司与工位端只读（FR-036）。
+"""T118：模板仅总部可访问（FR-036）。
 
-"模板统一"的前提是子公司改不了它。只读不是靠前端藏按钮——
-按钮藏得住，请求藏不住。
+"模板统一"的前提是子公司改不了它。访问控制不是靠前端藏按钮——
+按钮藏得住，请求藏不住。子公司与工位端连列表和版本都不可见。
 """
 
 import pytest
@@ -27,22 +27,31 @@ def template(db: Session):
     return created
 
 
-class TestReadIsAllowed:
-    def test_sub_admin_can_list_templates(self, client, sub_admin: User, template):
-        resp = client.get("/api/v1/templates", headers=auth_header(sub_admin))
+class TestReadIsHqOnly:
+    def test_hq_admin_can_list_templates(self, client, hq_admin: User, template):
+        resp = client.get("/api/v1/templates", headers=auth_header(hq_admin))
         assert resp.status_code == 200
         assert any(t["code"] == "RO1" for t in resp.json())
 
-    def test_sub_admin_can_read_versions(self, client, sub_admin: User, template):
+    def test_hq_admin_can_read_versions(self, client, hq_admin: User, template):
         resp = client.get(
-            f"/api/v1/templates/{template.id}/versions", headers=auth_header(sub_admin)
+            f"/api/v1/templates/{template.id}/versions", headers=auth_header(hq_admin)
         )
         assert resp.status_code == 200
         assert len(resp.json()) == 1
 
-    def test_operator_can_read_templates(self, client, operator: User, template):
-        """工位端要知道自己被分配的是哪套模板。"""
-        assert client.get("/api/v1/templates", headers=auth_header(operator)).status_code == 200
+    def test_sub_admin_cannot_list_templates(self, client, sub_admin: User, template):
+        assert client.get("/api/v1/templates", headers=auth_header(sub_admin)).status_code == 403
+
+    def test_sub_admin_cannot_read_versions(self, client, sub_admin: User, template):
+        resp = client.get(
+            f"/api/v1/templates/{template.id}/versions", headers=auth_header(sub_admin)
+        )
+        assert resp.status_code == 403
+
+    def test_operator_cannot_read_templates(self, client, operator: User, template):
+        """工位端从打印载荷拿模板，不直接访问模板管理接口。"""
+        assert client.get("/api/v1/templates", headers=auth_header(operator)).status_code == 403
 
 
 class TestWritesAreDenied:
@@ -56,7 +65,7 @@ class TestWritesAreDenied:
         assert resp.json()["error_code"] == "FORBIDDEN_SCOPE"
 
     def test_sub_admin_cannot_add_a_version(self, client, sub_admin: User, template):
-        resp = client.patch(
+        resp = client.put(
             f"/api/v1/templates/{template.id}", headers=auth_header(sub_admin), json=PAYLOAD
         )
         assert resp.status_code == 403
@@ -81,7 +90,7 @@ class TestWritesAreDenied:
         assert template.status == "active", "被拒的操作不得改变任何状态"
 
     def test_operator_cannot_write_either(self, client, operator: User, template):
-        resp = client.patch(
+        resp = client.put(
             f"/api/v1/templates/{template.id}", headers=auth_header(operator), json=PAYLOAD
         )
         assert resp.status_code == 403
@@ -101,7 +110,7 @@ class TestHqAdminIsAllowed:
         assert resp.json()["current_version_no"] == 1
 
     def test_hq_admin_adds_a_second_version(self, client, hq_admin: User, template):
-        resp = client.patch(
+        resp = client.put(
             f"/api/v1/templates/{template.id}",
             headers=auth_header(hq_admin),
             json={**PAYLOAD, "paper_width_mm": 70},

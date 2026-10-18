@@ -26,7 +26,7 @@
       />
 
       <el-button @click="load">刷新</el-button>
-      <el-button @click="onExportStock">导出码量</el-button>
+      <el-button v-if="me?.role === 'hq_admin'" @click="onExportStock">导出码量</el-button>
     </div>
 
     <el-card shadow="never" class="totals">
@@ -68,6 +68,7 @@
 import { ElMessage } from 'element-plus'
 import { onMounted, ref } from 'vue'
 
+import { fetchMe, type MeUser } from '../../api/auth'
 import { ApiError } from '../../api/client'
 import {
   exportCodeStock,
@@ -96,6 +97,7 @@ const EMPTY: DistributionRow = {
   total: 0,
 }
 
+const me = ref<MeUser | null>(null)
 const rows = ref<DistributionRow[]>([])
 const totals = ref<DistributionRow>({ ...EMPTY })
 const groupBy = ref<GroupBy>('company_product')
@@ -133,7 +135,10 @@ async function onExportStock(): Promise<void> {
   }
 }
 
-onMounted(load)
+onMounted(async () => {
+  me.value = await fetchMe().catch(() => null)
+  await load()
+})
 </script>
 
 <style scoped>

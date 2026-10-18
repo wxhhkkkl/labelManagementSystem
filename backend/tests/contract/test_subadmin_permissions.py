@@ -171,7 +171,7 @@ def test_subadmin_adds_and_manages_only_own_employees(
         == 403
     )
     assert (
-        client.patch(
+        client.put(
             f"/api/v1/users/{hq_admin.id}", headers=headers, json={"password": "password456"}
         ).status_code
         == 403

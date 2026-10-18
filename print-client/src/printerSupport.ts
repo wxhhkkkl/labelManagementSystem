@@ -1,8 +1,11 @@
-/** 服务器上的三个驱动安装包地址集中维护在此；收到正式地址后替换。当前保留发布方入口。 */
+/** 三个驱动安装包统一放在阿里云 OSS 的 lms/drivers/ 下。 */
+export const DRIVER_BASE_URL =
+  'https://maxlabelmall.oss-cn-wulanchabu.aliyuncs.com/lms/drivers/'
+
 export const printerDownloadUrls = {
-  zenpert: 'https://www.bartendersoftware.com/cn/resources/printer-drivers/zenpert/zenpert-4t200',
-  tsc: 'https://www.bartendersoftware.com/cn/resources/printer-drivers/tsc/tsc-ttp-244-pro',
-  datamax: 'https://www.bartendersoftware.com/resources/printer-drivers/datamax-oneil/datamax-m-4308-mark-ii',
+  zenpert: `${DRIVER_BASE_URL}Zenpert.zip`,
+  tsc: `${DRIVER_BASE_URL}TSC.zip`,
+  datamax: `${DRIVER_BASE_URL}Datamax.zip`,
 }
 
 /** 同品牌共用一个安装包，安装向导识别具体型号。 */

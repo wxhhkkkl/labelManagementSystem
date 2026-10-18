@@ -105,7 +105,7 @@ def test_sub_admin_cannot_edit_other_company_workstation(
     db.add(foreign)
     db.flush()
 
-    resp = client.patch(
+    resp = client.put(
         f"/api/v1/workstations/{foreign.id}",
         headers=auth_header(sub_admin),
         json={"name": "改名"},

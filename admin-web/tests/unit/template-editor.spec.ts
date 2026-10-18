@@ -16,6 +16,7 @@ import {
   moveElement,
   moveElementTo,
   removeElement,
+  rotateElement,
   typeLabel,
   updateElement,
   validateDocument,
@@ -76,6 +77,28 @@ describe('clampElement', () => {
     const result = clampElement({ type: 'barcode', x: 5, y: 5, width: 200, height: 200 }, doc)
     expect(result.x).toBe(0)
     expect(result.y).toBe(0)
+  })
+
+  it('clamps using the rotated bounding box', () => {
+    // 20×4 的文本旋转 90° 后占用 4×20，右边界按 4mm 计算
+    const result = clampElement(
+      { type: 'text', x: 58, y: 5, content: 'x', font_size: 3, width: 20, height: 4, rotate: 90 },
+      doc,
+    )
+    expect(result.x).toBe(56)
+  })
+})
+
+describe('rotateElement', () => {
+  it('keeps the bounding-box center and swaps the footprint', () => {
+    const input: TemplateDoc = {
+      ...doc,
+      elements: [{ type: 'text', x: 20, y: 15, content: 'x', font_size: 3, width: 20, height: 4 }],
+    }
+    const rotated = rotateElement(input, 0, 90).elements[0]
+    expect(rotated.rotate).toBe(90)
+    expect(rotated.x).toBe(28) // center 30 - 新宽度 4/2
+    expect(rotated.y).toBe(7) // center 17 - 新高度 20/2
   })
 })
 

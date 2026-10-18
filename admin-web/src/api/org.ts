@@ -62,7 +62,7 @@ export const createWorkstation = (json: Record<string, unknown>) =>
   request<Workstation>('/api/v1/workstations', { method: 'POST', json })
 
 export const updateWorkstation = (id: number, json: Record<string, unknown>) =>
-  request<Workstation>(`/api/v1/workstations/${id}`, { method: 'PATCH', json })
+  request<Workstation>(`/api/v1/workstations/${id}`, { method: 'PUT', json })
 
 export const disableWorkstation = (id: number) =>
   request<Workstation>(`/api/v1/workstations/${id}/disable`, { method: 'POST' })

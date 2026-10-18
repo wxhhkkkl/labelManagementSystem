@@ -29,7 +29,7 @@ export const createTemplate = (json: Record<string, unknown>) =>
 
 export const addTemplateVersion = (templateId: number, doc: TemplateDoc) =>
   request<TemplateVersionItem>(`/api/v1/templates/${templateId}`, {
-    method: 'PATCH',
+    method: 'PUT',
     json: {
       paper_width_mm: doc.paper_width_mm,
       paper_height_mm: doc.paper_height_mm,

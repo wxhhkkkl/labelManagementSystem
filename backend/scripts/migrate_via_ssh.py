@@ -269,6 +269,8 @@ def main() -> int:
         if args.test:
             code = run_tests(settings, list(args.pytest_args or []))
             print(f"[测试] pytest 退出码 {code}")
+            if code != 0:
+                return code
     finally:
         server.shutdown()
         server.server_close()

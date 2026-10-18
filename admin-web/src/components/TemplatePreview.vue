@@ -12,12 +12,14 @@
             :data-type="item.element.type"
             :data-field="item.element.field_name ?? ''"
           >
-            <img
-              v-if="item.url"
-              :src="item.url"
-              :alt="item.element.type === 'qrcode' ? '二维码' : '条码'"
-            />
-            <template v-else>{{ item.text }}</template>
+            <div class="el-content" :style="item.contentStyle">
+              <img
+                v-if="item.url"
+                :src="item.url"
+                :alt="item.element.type === 'qrcode' ? '二维码' : '条码'"
+              />
+              <template v-else>{{ item.text }}</template>
+            </div>
           </div>
         </div>
       </div>
@@ -32,6 +34,7 @@ import { computed } from 'vue'
 import {
   CSS_PX_PER_MM,
   clipToPaper,
+  elementContentStyle,
   elementStyle,
   elementText,
   graphicDataUrl,
@@ -57,6 +60,7 @@ const rendered = computed(() =>
       element,
       clipped,
       style: elementStyle(original),
+      contentStyle: elementContentStyle(original),
       text: elementText(original, props.data),
       url,
       error,

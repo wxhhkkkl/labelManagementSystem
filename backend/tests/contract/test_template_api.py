@@ -49,10 +49,10 @@ class TestCreateAndList:
 
 
 class TestVersions:
-    def test_patch_appends_a_version(self, client, hq_admin: User):
+    def test_put_appends_a_version(self, client, hq_admin: User):
         template_id = _create(client, hq_admin, code="TC4").json()["id"]
 
-        resp = client.patch(
+        resp = client.put(
             f"/api/v1/templates/{template_id}",
             headers=auth_header(hq_admin),
             json={**DOC, "paper_width_mm": 70, "paper_height_mm": 50},
@@ -174,3 +174,17 @@ class TestElementValidation:
         """空白模板是合法起点——管理员先建模板再往里加元素。"""
         doc = {"paper_width_mm": 60, "paper_height_mm": 40, "elements": []}
         assert _create(client, hq_admin, code="TV10", doc=doc).status_code == 201
+
+
+def test_request_validation_error_uses_unified_error_body(client, hq_admin: User):
+    """422 也要走统一错误体，前端才能把具体字段展示给管理员。"""
+    resp = client.put(
+        "/api/v1/templates/999999",
+        headers=auth_header(hq_admin),
+        json={"paper_width_mm": 60},
+    )
+    assert resp.status_code == 422
+    body = resp.json()
+    assert body["error_code"] == "VALIDATION_ERROR"
+    assert "paper_height_mm" in body["message"]
+    assert body["details"]["errors"][0]["loc"][0] == "body"

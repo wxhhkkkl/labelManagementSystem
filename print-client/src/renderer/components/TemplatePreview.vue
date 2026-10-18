@@ -4,7 +4,9 @@
     <div v-else :style="{width:`${mmToPx(doc.paper_width_mm)*scale}px`,height:`${mmToPx(doc.paper_height_mm)*scale}px`}">
       <div class="preview-paper" :style="{width:`${doc.paper_width_mm}mm`,height:`${doc.paper_height_mm}mm`,transform:`scale(${scale})`}">
         <div v-for="(item,i) in rendered.items" :key="i" :style="item.style">
-          <img v-if="item.image" :src="item.image" alt="二维码或条码" /><template v-else>{{ item.text }}</template>
+          <div :style="item.contentStyle">
+            <img v-if="item.image" :src="item.image" alt="二维码或条码" /><template v-else>{{ item.text }}</template>
+          </div>
         </div>
       </div>
     </div>

@@ -105,15 +105,17 @@
                 :data-element-index="index"
                 @pointerdown.stop.prevent="onPointerDown(index, $event)"
               >
-                <template v-if="el.type === 'qrcode' || el.type === 'barcode'"
-                  ><img
-                    v-if="graphic(el).url"
-                    :src="graphic(el).url"
-                    :alt="typeLabel(el.type)"
-                    draggable="false"
-                  /><span v-else class="graphic-error">{{ graphic(el).error }}</span></template
-                >
-                <template v-else>{{ elementText(el, sampleData) }}</template>
+                <div class="el-content" :style="elementContentStyle(el)">
+                  <template v-if="el.type === 'qrcode' || el.type === 'barcode'"
+                    ><img
+                      v-if="graphic(el).url"
+                      :src="graphic(el).url"
+                      :alt="typeLabel(el.type)"
+                      draggable="false"
+                    /><span v-else class="graphic-error">{{ graphic(el).error }}</span></template
+                  >
+                  <template v-else>{{ elementText(el, sampleData) }}</template>
+                </div>
               </div>
             </div>
           </div>
@@ -155,6 +157,17 @@
                 aria-label="元素 Y 坐标"
             /></label>
           </div>
+          <label
+            >旋转角度<el-select
+              :model-value="selectedEl.rotate ?? 0"
+              aria-label="元素旋转角度"
+              @update:model-value="setRotation"
+              ><el-option
+                v-for="angle in [0, 90, 180, 270]"
+                :key="angle"
+                :value="angle"
+                :label="`${angle}°`" /></el-select
+          ></label>
           <label v-if="selectedEl.type === 'qrcode'"
             >尺寸（mm）<el-input-number
               controls-position="right"
@@ -374,13 +387,15 @@ import {
   elementSummary,
   moveElement,
   removeElement,
+  rotateElement,
   typeLabel,
   updateElement,
   validateDocument,
 } from '../utils/templateEditor'
 import {
   CSS_PX_PER_MM,
-  elementSizeMm,
+  elementBoundsMm,
+  elementContentStyle,
   elementStyle,
   elementText,
   graphicDataUrl,
@@ -436,14 +451,15 @@ const graphicSource = computed(() =>
 const maxX = computed(() =>
   Math.max(
     0,
-    localDoc.value.paper_width_mm - (selectedEl.value ? elementSizeMm(selectedEl.value).width : 0),
+    localDoc.value.paper_width_mm -
+      (selectedEl.value ? elementBoundsMm(selectedEl.value).width : 0),
   ),
 )
 const maxY = computed(() =>
   Math.max(
     0,
     localDoc.value.paper_height_mm -
-      (selectedEl.value ? elementSizeMm(selectedEl.value).height : 0),
+      (selectedEl.value ? elementBoundsMm(selectedEl.value).height : 0),
   ),
 )
 function remember(doc: TemplateDoc) {
@@ -552,6 +568,10 @@ function reorder(delta: number) {
   elements.splice(to, 0, el)
   commit({ ...localDoc.value, elements })
   selected.value = to
+}
+function setRotation(angle: number) {
+  if (selected.value === null) return
+  commit(rotateElement(localDoc.value, selected.value, angle))
 }
 function setSource(source: string) {
   if (selected.value === null) return

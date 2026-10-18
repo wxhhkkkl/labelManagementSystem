@@ -4,6 +4,9 @@
 
 所有接口按 R7 强制组织隔离；下表"角色"列标注最低权限要求。总部管理员除特别说明外拥有全部权限。
 
+**更新接口的方法**：`PUT` 与 `PATCH` 等价可用；因阿里云 CDN 不支持 `PATCH`
+（直接返回 `400 request parse msg error`，请求不会到达应用），管理前端 MUST 使用 `PUT`。
+
 ---
 
 ## 组织与账号
@@ -11,20 +14,20 @@
 | 方法 | 路径 | 用途 | 角色 | 规格 |
 |------|------|------|------|------|
 | POST | `/api/v1/companies` | 创建公司 | 总部 | FR-001 |
-| PATCH | `/api/v1/companies/{id}` | 编辑公司 | 总部 | FR-001 |
+| PUT | `/api/v1/companies/{id}` | 编辑公司 | 总部 | FR-001 |
 | POST | `/api/v1/companies/{id}/disable` | 停用公司 | 总部 | FR-003 |
 | GET | `/api/v1/companies` | 公司列表 | 总部 | FR-001 |
 | GET | `/api/v1/org/tree` | 组织树（公司→工位下钻） | 总部 | FR-008 |
 | POST | `/api/v1/workstations` | 创建工位 | 总部 / 子公司 | FR-002 |
-| PATCH | `/api/v1/workstations/{id}` | 编辑工位（含绑定打印机、绑定操作员） | 总部 / 本子公司 | FR-002 |
+| PUT | `/api/v1/workstations/{id}` | 编辑工位（含绑定打印机、绑定操作员） | 总部 / 本子公司 | FR-002 |
 | POST | `/api/v1/workstations/{id}/disable` | 停用工位 | 总部 / 本子公司 | FR-003 |
 | GET | `/api/v1/workstations` | 工位列表（含在线状态） | 总部 / 本子公司 | FR-002 |
 | POST | `/api/v1/users` | 创建账号 | 总部（任意角色）/ 子公司（仅操作员） | FR-004 |
-| PATCH | `/api/v1/users/{id}` | 编辑账号 | 同上 | FR-004 |
+| PUT | `/api/v1/users/{id}` | 编辑账号 | 同上 | FR-004 |
 | POST | `/api/v1/users/{id}/disable` | 停用账号 | 同上 | FR-004 |
 | GET | `/api/v1/users` | 账号列表 | 总部 / 本子公司操作员 | FR-004 |
 
-**约束**：`POST/PATCH /users` 由子公司管理员调用时，`role` MUST 为 `operator` 且 `company_id` MUST
+**约束**：`POST/PUT /users` 由子公司管理员调用时，`role` MUST 为 `operator` 且 `company_id` MUST
 等于其自身公司；越界返回 `403 FORBIDDEN_SCOPE`（FR-004）。
 
 ---
@@ -34,7 +37,7 @@
 | 方法 | 路径 | 用途 | 角色 | 规格 |
 |------|------|------|------|------|
 | POST | `/api/v1/products` | 创建产品 | 总部 | FR-009 |
-| PATCH | `/api/v1/products/{id}` | 编辑产品 | 总部 | FR-009 |
+| PUT | `/api/v1/products/{id}` | 编辑产品 | 总部 | FR-009 |
 | POST | `/api/v1/products/{id}/disable` | 停用产品 | 总部 | FR-010 |
 | GET | `/api/v1/products` | 产品列表（含累计导入/已分配/已打印量） | 总部 / 子公司 | FR-011 |
 
@@ -70,7 +73,7 @@
 |------|------|------|------|------|
 | POST | `/api/v1/codes/bind` | 按批次批量绑定或换绑产品 | 总部 | FR-022 |
 | GET | `/api/v1/codes` | 码池查询（按批次/产品/状态筛选） | 总部 / 子公司 | FR-011 |
-| GET | `/api/v1/codes/{code_value}` | 码详情 + 生命周期时间线 | 总部 / 子公司（本公司） | FR-064 |
+| GET | `/api/v1/codes/{code_value}` | 码详情 + 生命周期时间线 | **仅总部** | FR-064 |
 | POST | `/api/v1/allocations` | 按"公司 + 产品 + 数量"分配码 | 总部 | FR-025 |
 | POST | `/api/v1/allocations/{id}/reclaim` | 回收未打印的码 | 总部 | FR-029 |
 | GET | `/api/v1/allocations` | 分配单列表 | 总部 / 子公司 | FR-027 |
@@ -103,10 +106,10 @@ MUST 拒绝回收整单（FR-030）；仅 `allocated` 的码可回收到码池�
 | 方法 | 路径 | 用途 | 角色 | 规格 |
 |------|------|------|------|------|
 | POST | `/api/v1/templates` | 新建模板（含首个版本） | 总部 | FR-032 |
-| PATCH | `/api/v1/templates/{id}` | 编辑模板 → 生成新版本 | 总部 | FR-033 |
+| PUT | `/api/v1/templates/{id}` | 编辑模板 → 生成新版本 | 总部 | FR-033 |
 | POST | `/api/v1/templates/{id}/disable` | 停用模板 | 总部 | FR-033 |
-| GET | `/api/v1/templates` | 模板列表 | 总部 / 子公司（只读） | FR-032 |
-| GET | `/api/v1/templates/{id}/versions` | 版本列表 | 总部 / 子公司（只读） | FR-033 |
+| GET | `/api/v1/templates` | 模板列表 | **仅总部** | FR-032 |
+| GET | `/api/v1/templates/{id}/versions` | 版本列表 | **仅总部** | FR-033 |
 | PUT | `/api/v1/templates/{id}/versions/{no}` | 修改模板版本内容 | 总部 | FR-033 |
 
 **约束**：修改 `frozen=true` 的版本返回 `409 TEMPLATE_VERSION_FROZEN`（FR-034）。
@@ -151,7 +154,7 @@ MUST 拒绝回收整单（FR-030）；仅 `allocated` 的码可回收到码池�
 
 | 方法 | 路径 | 用途 | 角色 | 规格 |
 |------|------|------|------|------|
-| GET | `/api/v1/dashboard/code-distribution` | 看板：按公司/产品的四态码量分布 | 总部 / 子公司 | FR-065 |
+| GET | `/api/v1/dashboard/code-distribution` | 看板：按公司/产品的四态码量分布 | 总部 / 子公司（本公司） | FR-065 |
 | GET | `/api/v1/reports/prints` | 打印明细（公司/工位/操作员/产品/时间段筛选） | 总部 / 子公司 | FR-066 |
 | GET | `/api/v1/reports/prints/export` | 导出打印明细 Excel | 总部 / 子公司 | FR-066 |
 | GET | `/api/v1/reports/code-stock/export` | 导出码量看板 Excel | 总部 | FR-031 |

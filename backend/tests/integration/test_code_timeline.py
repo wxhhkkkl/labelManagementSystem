@@ -180,18 +180,15 @@ class TestNoEventsCase:
 
 
 class TestVisibility:
-    """时间线按数据归属可见，与审计日志（仅总部）不同。"""
+    """码详情与时间线仅总部可查。"""
 
-    def test_sub_admin_can_read_own_company_code(self, client, sub_admin: User, walked_code):
+    def test_sub_admin_is_denied(self, client, sub_admin: User, walked_code):
         resp = client.get(f"/api/v1/codes/{walked_code}", headers=auth_header(sub_admin))
-        assert resp.status_code == 200
-        assert resp.json()["code_value"] == walked_code
+        assert resp.status_code == 403
 
-    def test_operator_can_read_own_company_code(self, client, operator: User, walked_code):
-        assert (
-            client.get(f"/api/v1/codes/{walked_code}", headers=auth_header(operator)).status_code
-            == 200
-        )
+    def test_operator_is_denied(self, client, operator: User, walked_code):
+        resp = client.get(f"/api/v1/codes/{walked_code}", headers=auth_header(operator))
+        assert resp.status_code == 403
 
     def test_other_company_sub_admin_is_denied(
         self, client, other_sub_admin: User, walked_code

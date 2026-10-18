@@ -5,6 +5,7 @@ import {
   graphicSvg,
   renderTemplate,
   elementSizeMm,
+  clipToPaper,
 } from '../../src/print-render/renderer'
 
 describe('日期、流水号与图形内容', () => {
@@ -43,8 +44,10 @@ describe('日期、流水号与图形内容', () => {
       { paper_width_mm: 60, paper_height_mm: 40, elements: [el] },
       {},
     )[0]
-    expect(rendered.element.width).toBe(5)
     expect(rendered.style.width).toBe('15mm')
+    expect(
+      clipToPaper(el, { paper_width_mm: 60, paper_height_mm: 40, elements: [el] }).clipped,
+    ).toBe(true)
   })
   it('keeps explicit text box height and newline formatting', () => {
     const el = {
@@ -62,7 +65,7 @@ describe('日期、流水号与图形内容', () => {
       { paper_width_mm: 60, paper_height_mm: 40, elements: [el] },
       {},
     )[0]
-    expect(rendered.style.whiteSpace).toBe('pre-wrap')
+    expect(rendered.contentStyle.whiteSpace).toBe('pre-wrap')
   })
 })
 

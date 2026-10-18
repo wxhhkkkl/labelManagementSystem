@@ -12,6 +12,8 @@ import {
   PRINT_SCALE_FACTOR,
   RenderError,
   clipToPaper,
+  elementBoundsMm,
+  elementContentStyle,
   elementSizeMm,
   elementStyle,
   fontFamilyChain,
@@ -76,19 +78,22 @@ describe('元素越界处理', () => {
   it('leaves an in-bounds element untouched', () => {
     const { element, clipped } = clipToPaper({ type: 'qrcode', x: 10, y: 10, size: 10 }, doc)
     expect(clipped).toBe(false)
-    expect(element).toMatchObject({ x: 10, y: 10, width: 10, height: 10 })
+    expect(element).toMatchObject({ x: 10, y: 10, size: 10 })
   })
 
-  it('clips rather than scales at the right edge', () => {
+  it('flags an element hanging off the right edge without scaling it', () => {
     const { element, clipped } = clipToPaper({ type: 'qrcode', x: 55, y: 5, size: 20 }, doc)
     expect(clipped).toBe(true)
-    expect(element.width).toBe(5)
-    expect(element.height).toBe(20)
+    expect(element.size).toBe(20)
   })
 
-  it('clips at the bottom edge', () => {
-    const { element } = clipToPaper({ type: 'barcode', x: 0, y: 35, width: 20, height: 20 }, doc)
-    expect(element.height).toBe(5)
+  it('flags an element beyond the bottom edge', () => {
+    const { element, clipped } = clipToPaper(
+      { type: 'barcode', x: 0, y: 35, width: 20, height: 20 },
+      doc,
+    )
+    expect(clipped).toBe(true)
+    expect(element.height).toBe(20)
   })
 
   it('pushes a negative origin back into the paper', () => {
@@ -136,9 +141,25 @@ describe('字体回退', () => {
 
 describe('样式生成', () => {
   it('expresses font size in mm, not pt', () => {
-    const style = elementStyle({ type: 'text', x: 1, y: 2, content: 'hi', font_size: 3 })
+    const style = elementContentStyle({ type: 'text', x: 1, y: 2, content: 'hi', font_size: 3 })
     expect(style.fontSize).toBe('3mm')
     expect(style.fontSize).not.toContain('pt')
+  })
+
+  it('swaps the bounding box for 90/270 and rotates the content', () => {
+    const el = { type: 'text', x: 10, y: 5, content: 'x', font_size: 3, width: 20, height: 4 }
+    expect(elementBoundsMm({ ...el, rotate: 90 })).toEqual({ width: 4, height: 20 })
+    expect(elementStyle({ ...el, rotate: 90 })).toMatchObject({
+      left: '10mm',
+      top: '5mm',
+      width: '4mm',
+      height: '20mm',
+    })
+    expect(elementContentStyle({ ...el, rotate: 90 })).toMatchObject({
+      left: '-8mm',
+      top: '8mm',
+      transform: 'rotate(90deg)',
+    })
   })
 
   it('uses mm for position and size', () => {
@@ -181,7 +202,8 @@ describe('整份模板渲染', () => {
 
   it('keeps every element inside the paper', () => {
     for (const { element } of renderTemplate(full, {})) {
-      expect((element.x ?? 0) + (element.width ?? 0)).toBeLessThanOrEqual(doc.paper_width_mm)
+      const bounds = elementBoundsMm(element)
+      expect((element.x ?? 0) + bounds.width).toBeLessThanOrEqual(doc.paper_width_mm)
     }
   })
 })
@@ -201,5 +223,21 @@ describe('HTML 输出', () => {
     )
     expect(html).not.toContain('<script>')
     expect(html).toContain('&lt;script&gt;')
+  })
+
+  it('wraps rotated content in a swapped bounding box', () => {
+    const html = renderToString(
+      {
+        ...doc,
+        elements: [
+          { type: 'text', x: 10, y: 5, content: 'hi', font_size: 3, width: 20, height: 4, rotate: 90 },
+        ],
+      },
+      {},
+    )
+    expect(html).toContain('class="el-wrap text"')
+    expect(html).toContain('width:4mm')
+    expect(html).toContain('height:20mm')
+    expect(html).toContain('transform:rotate(90deg)')
   })
 })

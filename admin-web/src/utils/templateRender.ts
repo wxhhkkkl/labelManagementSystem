@@ -23,6 +23,8 @@ export interface TemplateElement {
   type: string
   x: number
   y: number
+  /** 顺时针旋转角度；x/y 是旋转后外接框的左上角。 */
+  rotate?: number
   size?: number
   width?: number
   height?: number
@@ -82,6 +84,15 @@ export function elementSizeMm(el: TemplateElement): { width: number; height: num
   }
 }
 
+/** 旋转后占用的外接框尺寸；90/270 时宽高互换。 */
+export function elementBoundsMm(el: TemplateElement): { width: number; height: number } {
+  const { width, height } = elementSizeMm(el)
+  const angle = ((el.rotate ?? 0) % 360 + 360) % 360
+  return angle === 90 || angle === 270
+    ? { width: height, height: width }
+    : { width, height }
+}
+
 export interface ClippedElement {
   element: TemplateElement
   clipped: boolean
@@ -94,17 +105,14 @@ export interface ClippedElement {
  * 让同一份模板在不同纸张上印出不同比例。
  */
 export function clipToPaper(el: TemplateElement, doc: TemplateDoc): ClippedElement {
-  const { width, height } = elementSizeMm(el)
+  const { width, height } = elementBoundsMm(el)
   const maxX = doc.paper_width_mm
   const maxY = doc.paper_height_mm
 
   const x = Math.max(0, Math.min(el.x, maxX))
   const y = Math.max(0, Math.min(el.y, maxY))
-  const w = Math.max(0, Math.min(width, maxX - x))
-  const h = Math.max(0, Math.min(height, maxY - y))
-
-  const clipped = x !== el.x || y !== el.y || w !== width || h !== height
-  return { element: { ...el, x, y, width: w, height: h }, clipped }
+  const clipped = x !== el.x || y !== el.y || x + width > maxX || y + height > maxY
+  return { element: { ...el, x, y }, clipped }
 }
 
 /** 动态字段取值。缺失时渲染空串，MUST NOT 渲染 "null" 或占位符。 */
@@ -118,22 +126,39 @@ export function fontFamilyChain(family?: string): string {
   return [family, ...FONT_FALLBACK].filter(Boolean).join(', ')
 }
 
-/** 生成元素的内联样式（单位 mm，浏览器按 mm 排印再交给打印）。 */
+/** 元素外接框的定位样式（单位 mm）。 */
 export function elementStyle(el: TemplateElement): Record<string, string> {
   assertKnownType(el.type)
-  const { width, height } = elementSizeMm(el)
-  const align = el.align ?? 'left'
-
-  const style: Record<string, string> = {
+  const { width, height } = elementBoundsMm(el)
+  return {
     position: 'absolute',
     left: `${el.x}mm`,
     top: `${el.y}mm`,
     width: `${width}mm`,
     height: `${height}mm`,
-    textAlign: align,
     overflow: 'hidden',
     boxSizing: 'border-box',
   }
+}
+
+/** 外接框内的内容样式：按未旋转尺寸居中，再绕中心旋转。 */
+export function elementContentStyle(el: TemplateElement): Record<string, string> {
+  assertKnownType(el.type)
+  const bounds = elementBoundsMm(el)
+  const { width, height } = elementSizeMm(el)
+  const angle = el.rotate ?? 0
+  const style: Record<string, string> = {
+    position: 'absolute',
+    left: `${(bounds.width - width) / 2}mm`,
+    top: `${(bounds.height - height) / 2}mm`,
+    width: `${width}mm`,
+    height: `${height}mm`,
+    textAlign: el.align ?? 'left',
+    overflow: 'hidden',
+    boxSizing: 'border-box',
+    transformOrigin: 'center center',
+  }
+  if (angle) style.transform = `rotate(${angle}deg)`
 
   if (['text', 'field', 'date', 'serial'].includes(el.type)) {
     style.fontSize = `${el.font_size ?? 0}mm` // 字号也是毫米，不是 pt
@@ -150,11 +175,21 @@ export function elementStyle(el: TemplateElement): Record<string, string> {
 export function renderTemplate(
   doc: TemplateDoc,
   data: Record<string, string>,
-): { element: TemplateElement; style: Record<string, string>; text: string | null }[] {
+): {
+  element: TemplateElement
+  style: Record<string, string>
+  contentStyle: Record<string, string>
+  text: string | null
+}[] {
   return doc.elements.map((original) => {
     const { element } = clipToPaper(original, doc)
     const text = ['qrcode', 'barcode'].includes(element.type) ? null : elementText(element, data)
-    return { element, style: elementStyle(original), text }
+    return {
+      element,
+      style: elementStyle(original),
+      contentStyle: elementContentStyle(original),
+      text,
+    }
   })
 }
 

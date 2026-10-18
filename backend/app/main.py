@@ -3,10 +3,12 @@
 启动钩子把残留的中断导入批次置为 interrupted（research.md R3，本期不做断点续传）。
 """
 
+import logging
 from contextlib import asynccontextmanager
 
 import jwt
 from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from sqlalchemy import update
 from sqlalchemy.orm import Session
@@ -16,6 +18,8 @@ from app.core.config import assert_production_ready
 from app.core.errors import ApiError, ErrorCode, error_body
 from app.models.base import utcnow
 from app.tasks import import_worker, lock_timeout_sweeper, task_expiry
+
+logger = logging.getLogger(__name__)
 
 
 def _mark_interrupted_imports() -> None:
@@ -143,6 +147,36 @@ async def business_error_handler(request: Request, exc: ApiError) -> JSONRespons
     return JSONResponse(
         status_code=exc.status_code,
         content=error_body(exc.error_code, exc.message, exc.details),
+    )
+
+
+@app.exception_handler(RequestValidationError)
+async def request_validation_handler(
+    request: Request, exc: RequestValidationError
+) -> JSONResponse:
+    """把请求体校验失败转成统一错误体，前端可直接展示出错的字段。"""
+    errors = [
+        {
+            "loc": [str(part) for part in err.get("loc", ())],
+            "msg": str(err.get("msg", "")),
+            "type": str(err.get("type", "")),
+        }
+        for err in exc.errors()
+    ]
+    if request.url.path.startswith("/api/v1/templates"):
+        # 模板内容不敏感；记录 input 便于定位编辑器产出的非法字段
+        logger.warning(
+            "template validation failed: %s %s %s",
+            request.method,
+            request.url.path,
+            exc.errors(),
+        )
+    first = errors[0] if errors else {"loc": [], "msg": "请求参数不合法"}
+    field = ".".join(part for part in first["loc"] if part != "body")
+    message = f"{field}: {first['msg']}" if field else first["msg"]
+    return JSONResponse(
+        status_code=422,
+        content=error_body(ErrorCode.VALIDATION_ERROR, message, {"errors": errors}),
     )
 
 

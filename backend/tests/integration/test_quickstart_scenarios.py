@@ -282,6 +282,12 @@ class TestRenderPayloadMatchesTemplate:
 
         assert item["template_version_id"] == template_version.id
         assert item["elements_json"]["paper_width_mm"] == TEMPLATE_60X40
-        # 四个动态字段齐全，工位端拿到就能直接渲染（FR-037）
-        assert set(item["data"]) == {"product_name", "company_name", "code_value", "batch_no"}
+        # 五个动态字段齐全，工位端拿到就能直接渲染（FR-037）
+        assert set(item["data"]) == {
+            "product_name",
+            "company_name",
+            "code_value",
+            "batch_no",
+            "production_batch_no",
+        }
         assert item["data"]["batch_no"].startswith("ALL")
