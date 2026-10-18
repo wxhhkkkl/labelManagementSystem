@@ -41,7 +41,7 @@
     </el-form>
 
     <p class="hint">
-      补打会派发到该码**最近一次打印的原工位**并自动出纸，无需选择打印机；
+      补打会派发到该码最近一次打印的原工位，由操作员在打印端补打任务中点击“打印”，无需在后台选择打印机；
       原工位离线时会被拒绝。<template v-if="me?.role === 'hq_admin'"
         >作废是不可恢复的终态。</template
       >
@@ -94,7 +94,7 @@ async function doReprint(): Promise<void> {
   busy.value = true
   try {
     const task = await requestReprint(codeValue.value.trim(), reason.value)
-    notice.value = `补打任务已派发到工位「${task.target_workstation_name ?? task.target_workstation_id}」，稍后自动出纸`
+    notice.value = `补打任务已派发到工位「${task.target_workstation_name ?? task.target_workstation_id}」，请操作员在打印端补打任务中点击“打印”`
     ElMessage.success('补打任务已创建')
     reason.value = ''
     emit('done')

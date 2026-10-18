@@ -12,6 +12,7 @@ export const router = createRouter({
       component: () => import('../views/auth/LoginView.vue'),
     },
     { path: '/', redirect: '/org' },
+    { path: '/help', name: 'user-manual', component: () => import('../views/help/UserManualView.vue') },
     {
       path: '/org',
       name: 'org-tree',

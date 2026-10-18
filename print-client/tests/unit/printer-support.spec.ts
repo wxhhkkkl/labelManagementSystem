@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { isPrinterSupportUrl, printerGuides } from '../../src/printerSupport'
 
 describe('打印机下载链接的外部打开边界', () => {
-  it('允许四款型号内置的驱动与厂商支持页', () => {
-    expect(printerGuides).toHaveLength(4)
+  it('允许三个品牌配置的驱动与厂商支持页', () => {
+    expect(printerGuides).toHaveLength(3)
     for(const guide of printerGuides) {
       expect(isPrinterSupportUrl(guide.download)).toBe(true)
       expect(isPrinterSupportUrl(guide.support)).toBe(true)

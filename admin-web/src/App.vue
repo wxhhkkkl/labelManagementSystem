@@ -7,10 +7,9 @@
         <span class="brand-mark">L</span>
         <div>标签管理系统<small>LABEL MANAGEMENT</small></div>
       </div>
-      <p class="workspace-label">管理后台</p>
       <nav aria-label="后台导航">
         <section v-for="group in visibleGroups" :key="group.label">
-          <p class="nav-group">{{ group.label }}</p>
+          <p v-if="group.label !== '工作空间'" class="nav-group">{{ group.label }}</p>
           <router-link
             v-for="item in group.items"
             :key="item.path"
@@ -33,6 +32,7 @@
           ><span class="separator">/</span><strong>{{ currentTitle }}</strong>
         </div>
         <div class="user-actions">
+          <router-link class="help-shortcut" to="/help">使用说明</router-link>
           <span class="user-avatar">{{ user?.display_name?.slice(0, 1) || '管' }}</span
           ><span>{{ user?.display_name || '管理后台' }}</span
           ><el-button text type="primary" @click="logout">退出登录</el-button>
@@ -98,6 +98,7 @@ const groups = [
       { path: '/audit-logs', label: '操作日志', icon: Document },
     ],
   },
+  { label: '帮助中心', items: [{ path: '/help', label: '使用说明', icon: Document }] },
 ]
 const currentGroup = computed(
   () =>
@@ -148,22 +149,26 @@ function logout() {
   display: flex;
   min-height: 100vh;
 }
+.help-shortcut { color:var(--lms-blue); text-decoration:none; white-space:nowrap; }
 .admin-sidebar {
+  position: sticky;
+  top: 0;
+  height: 100dvh;
+  align-self: flex-start;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
   width: 218px;
   flex-shrink: 0;
-  padding: 28px 16px 20px;
+  padding: 16px;
   background: #fff;
   border-right: 1px solid var(--lms-line);
 }
-.workspace-label {
-  color: var(--lms-muted);
-  font-size: 12px;
-  padding: 12px 10px 0;
-}
+.admin-sidebar nav { margin-top: 12px; }
 .nav-group {
   color: #8394ad;
   font-size: 11px;
-  padding: 18px 12px 6px;
+  padding: 10px 12px 4px;
+  line-height: 16px;
   margin: 0;
 }
 nav a {
@@ -172,10 +177,11 @@ nav a {
   gap: 12px;
   text-decoration: none;
   color: #536680;
-  padding: 10px 13px;
+  padding: 6px 13px;
   border-radius: 8px;
-  margin: 3px 0;
-  font-size: 14px;
+  margin: 1px 0;
+  font-size: 13px;
+  line-height: 20px;
 }
 nav a:hover,
 nav a.selected {
@@ -192,8 +198,8 @@ nav a.selected {
   flex-shrink: 0;
 }
 .sidebar-foot {
-  margin-top: 28px;
-  padding: 12px 8px;
+  margin-top: 10px;
+  padding: 6px 8px;
   font-size: 11px;
   color: var(--lms-muted);
 }
@@ -249,7 +255,7 @@ nav a.selected {
 @media (max-width: 900px) {
   .admin-sidebar {
     width: 190px;
-    padding: 24px 12px;
+    padding: 16px 12px;
   }
   .admin-main {
     padding: 24px 20px;
@@ -257,6 +263,13 @@ nav a.selected {
   .admin-topbar {
     padding: 16px 20px;
   }
+}
+@media (max-height: 800px) {
+  .admin-sidebar { padding-top: 12px; padding-bottom: 12px; }
+  .admin-sidebar nav { margin-top: 8px; }
+  .nav-group { padding-top: 7px; padding-bottom: 3px; }
+  nav a { padding-top: 5px; padding-bottom: 5px; margin: 0; }
+  .sidebar-foot { display: none; }
 }
 @media (max-width: 640px) {
   .admin-sidebar {
