@@ -4,13 +4,18 @@
 工位端从打印载荷获取模板内容，不直接访问本接口。
 """
 
+import base64
+import binascii
+import secrets
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Header
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
 from app.core.db import get_db
 from app.core.deps import ClientIp, HqAdmin
+from app.core.errors import ApiError, ErrorCode
 from app.models.template import TemplateVersion
 from app.schemas.template import (
     TemplateCreate,
@@ -24,6 +29,25 @@ from app.services import template as template_service
 router = APIRouter(prefix="/templates", tags=["template"])
 
 DbSession = Annotated[Session, Depends(get_db)]
+EditPassword = Annotated[str | None, Header(alias="X-Template-Edit-Password")]
+
+
+def _assert_edit_password(encoded: str | None) -> None:
+    """校验模板修改密码；未配置密码表示不启用保护（开发/测试）。
+
+    HTTP 头只能是 ASCII，因此前端传 Base64(UTF-8(密码))。
+    """
+    expected = get_settings().template_edit_password
+    if not expected:
+        return
+    try:
+        password = base64.b64decode(encoded or "", validate=True).decode("utf-8")
+    except (binascii.Error, UnicodeDecodeError):
+        password = ""
+    if not password or not secrets.compare_digest(
+        password.encode("utf-8"), expected.encode("utf-8")
+    ):
+        raise ApiError(ErrorCode.TEMPLATE_EDIT_DENIED, "模板修改密码错误")
 
 
 def _version_out(version: TemplateVersion) -> TemplateVersionOut:
@@ -89,9 +113,15 @@ def list_versions(template_id: int, user: HqAdmin, db: DbSession):
 @router.put("/{template_id}", response_model=TemplateVersionOut)
 @router.patch("/{template_id}", response_model=TemplateVersionOut)
 def update_template(
-    template_id: int, payload: TemplateUpdate, user: HqAdmin, db: DbSession, ip: ClientIp
+    template_id: int,
+    payload: TemplateUpdate,
+    user: HqAdmin,
+    db: DbSession,
+    ip: ClientIp,
+    edit_password: EditPassword = None,
 ) -> TemplateVersionOut:
     """修改模板 = 追加新版本（FR-033），历史版本内容保持原样。"""
+    _assert_edit_password(edit_password)
     version = template_service.add_version(db, template_id, **payload.model_dump())
     audit.record(
         db,
@@ -115,13 +145,13 @@ def replace_version(
     user: HqAdmin,
     db: DbSession,
     ip: ClientIp,
+    edit_password: EditPassword = None,
 ) -> TemplateVersionOut:
     """就地修改某个版本的内容——仅在该版本尚未被引用时允许（FR-034）。"""
+    _assert_edit_password(edit_password)
     versions = template_service.list_versions(db, template_id)
     target = next((v for v in versions if v.version_no == version_no), None)
     if target is None:
-        from app.core.errors import ApiError, ErrorCode
-
         raise ApiError(ErrorCode.NOT_FOUND, f"模板 {template_id} 不存在版本 {version_no}")
 
     version = template_service.replace_version_content(db, target.id, **payload.model_dump())

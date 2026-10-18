@@ -67,6 +67,11 @@ class Settings(BaseSettings):
     # 码值重复时的策略（FR-017）：reject_batch 整批拒绝（默认）| skip_row 按行跳过
     import_duplicate_policy: str = "reject_batch"
 
+    # ---- 模板修改保护 ----
+    # 修改模板内容时要求携带的密码。留空表示不校验（仅开发/测试）；
+    # 生产环境 MUST 通过环境变量设置，不得写进代码或仓库。
+    template_edit_password: str = ""
+
     # ---- 分页 ----
     default_page_size: int = 20
     max_page_size: int = 200

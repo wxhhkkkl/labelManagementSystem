@@ -113,6 +113,11 @@ MUST 拒绝回收整单（FR-030）；仅 `allocated` 的码可回收到码池�
 | PUT | `/api/v1/templates/{id}/versions/{no}` | 修改模板版本内容 | 总部 | FR-033 |
 
 **约束**：修改 `frozen=true` 的版本返回 `409 TEMPLATE_VERSION_FROZEN`（FR-034）。
+
+**修改保护**：`PUT /templates/{id}` 与 `PUT /templates/{id}/versions/{no}` 需额外携带请求头
+`X-Template-Edit-Password`，值为密码的 Base64(UTF-8) 编码；缺失或错误返回
+`403 TEMPLATE_EDIT_DENIED`。密码由服务端环境变量 `TEMPLATE_EDIT_PASSWORD` 配置，
+留空表示关闭校验（仅开发/测试）。
 模板元素定义（`elements_json`）的渲染规则由两端共享（R6），本接口只负责存取。
 
 ---

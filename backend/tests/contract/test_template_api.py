@@ -176,6 +176,42 @@ class TestElementValidation:
         assert _create(client, hq_admin, code="TV10", doc=doc).status_code == 201
 
 
+def test_saving_template_requires_the_edit_password(client, hq_admin: User, monkeypatch):
+    import base64
+    from types import SimpleNamespace
+
+    import app.api.v1.templates as templates_module
+
+    monkeypatch.setattr(
+        templates_module,
+        "get_settings",
+        lambda: SimpleNamespace(template_edit_password="test-template-password"),
+    )
+    template_id = _create(client, hq_admin, code="TPW").json()["id"]
+    doc = {**DOC, "paper_width_mm": 70, "paper_height_mm": 50}
+
+    missing = client.put(
+        f"/api/v1/templates/{template_id}", headers=auth_header(hq_admin), json=doc
+    )
+    assert missing.status_code == 403
+    assert missing.json()["error_code"] == "TEMPLATE_EDIT_DENIED"
+
+    encoded = lambda value: base64.b64encode(value.encode("utf-8")).decode("ascii")
+    wrong = client.put(
+        f"/api/v1/templates/{template_id}",
+        headers={**auth_header(hq_admin), "X-Template-Edit-Password": encoded("错误密码")},
+        json=doc,
+    )
+    assert wrong.status_code == 403
+
+    ok = client.put(
+        f"/api/v1/templates/{template_id}",
+        headers={**auth_header(hq_admin), "X-Template-Edit-Password": encoded("test-template-password")},
+        json=doc,
+    )
+    assert ok.status_code == 200
+
+
 def test_request_validation_error_uses_unified_error_body(client, hq_admin: User):
     """422 也要走统一错误体，前端才能把具体字段展示给管理员。"""
     resp = client.put(

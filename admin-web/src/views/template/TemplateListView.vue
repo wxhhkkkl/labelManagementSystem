@@ -189,26 +189,53 @@ async function openPreview(row: TemplateItem): Promise<void> {
 
 async function save(): Promise<void> {
   if (!editingDoc.value || saving.value || problems.value.length) return
+  if (editingTemplate.value) {
+    let password: string
+    try {
+      const result = await ElMessageBox.prompt('请输入模板修改密码', '修改模板', {
+        inputType: 'password',
+        inputPlaceholder: '请输入密码',
+        inputValidator: (value) => (value ? true : '请输入密码'),
+        confirmButtonText: '确认保存',
+        cancelButtonText: '取消',
+      })
+      password = result.value
+    } catch {
+      return
+    }
+    saving.value = true
+    try {
+      // 修改 = 追加新版本（FR-033），历史版本保持原样
+      const version = await addTemplateVersion(
+        editingTemplate.value.id,
+        editingDoc.value,
+        password,
+      )
+      ElMessage.success(`已生成新版本 V${version.version_no}`)
+      dialogVisible.value = false
+      await load()
+    } catch (e) {
+      fail(e, '保存模板失败')
+    } finally {
+      saving.value = false
+    }
+    return
+  }
+
   saving.value = true
   try {
-    if (editingTemplate.value) {
-      // 修改 = 追加新版本（FR-033），历史版本保持原样
-      const version = await addTemplateVersion(editingTemplate.value.id, editingDoc.value)
-      ElMessage.success(`已生成新版本 V${version.version_no}`)
-    } else {
-      if (!newCode.value.trim() || !newName.value.trim()) {
-        ElMessage.warning('请填写模板编码与名称')
-        return
-      }
-      await createTemplate({
-        code: newCode.value.trim(),
-        name: newName.value.trim(),
-        paper_width_mm: editingDoc.value.paper_width_mm,
-        paper_height_mm: editingDoc.value.paper_height_mm,
-        elements: editingDoc.value.elements,
-      })
-      ElMessage.success('模板已创建')
+    if (!newCode.value.trim() || !newName.value.trim()) {
+      ElMessage.warning('请填写模板编码与名称')
+      return
     }
+    await createTemplate({
+      code: newCode.value.trim(),
+      name: newName.value.trim(),
+      paper_width_mm: editingDoc.value.paper_width_mm,
+      paper_height_mm: editingDoc.value.paper_height_mm,
+      elements: editingDoc.value.elements,
+    })
+    ElMessage.success('模板已创建')
     dialogVisible.value = false
     await load()
   } catch (e) {

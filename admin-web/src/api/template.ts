@@ -22,14 +22,23 @@ export interface TemplateVersionItem {
   frozen: boolean
 }
 
+/** HTTP 头只能是 ASCII，密码按 Base64(UTF-8) 传输。 */
+function encodeEditPassword(password: string): string {
+  const bytes = new TextEncoder().encode(password)
+  let binary = ''
+  for (const byte of bytes) binary += String.fromCharCode(byte)
+  return btoa(binary)
+}
+
 export const listTemplates = () => request<TemplateItem[]>('/api/v1/templates')
 
 export const createTemplate = (json: Record<string, unknown>) =>
   request<TemplateItem>('/api/v1/templates', { method: 'POST', json })
 
-export const addTemplateVersion = (templateId: number, doc: TemplateDoc) =>
+export const addTemplateVersion = (templateId: number, doc: TemplateDoc, password: string) =>
   request<TemplateVersionItem>(`/api/v1/templates/${templateId}`, {
     method: 'PUT',
+    headers: { 'X-Template-Edit-Password': encodeEditPassword(password) },
     json: {
       paper_width_mm: doc.paper_width_mm,
       paper_height_mm: doc.paper_height_mm,
@@ -37,9 +46,15 @@ export const addTemplateVersion = (templateId: number, doc: TemplateDoc) =>
     },
   })
 
-export const replaceTemplateVersion = (templateId: number, versionNo: number, doc: TemplateDoc) =>
+export const replaceTemplateVersion = (
+  templateId: number,
+  versionNo: number,
+  doc: TemplateDoc,
+  password: string,
+) =>
   request<TemplateVersionItem>(`/api/v1/templates/${templateId}/versions/${versionNo}`, {
     method: 'PUT',
+    headers: { 'X-Template-Edit-Password': encodeEditPassword(password) },
     json: {
       paper_width_mm: doc.paper_width_mm,
       paper_height_mm: doc.paper_height_mm,
